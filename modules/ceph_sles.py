@@ -7,6 +7,7 @@
 
 # Import Python libs for logging
 import logging
+import os
 
 # Import salt library for running remote commnad
 import salt.modules.cmdmod as salt_cmd
@@ -84,9 +85,15 @@ def ceph_new( *node_names ):
 	for node in node_names :
 		node_list = node_list + node + ' '
 	
-	out_log  = __salt__['cmd.run_stdout']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph' )
-	out_log  = __salt__['cmd.run_stdout']('ceph-deploy mon create-initial' , output_loglevel='debug', runas='ceph' )
-	out_log  = __salt__['cmd.run_stdout']('ceph-deploy admin '+ node_list  , output_loglevel='debug', runas='ceph' )
+	if not os.path.exists( '/home/ceph/cluster_config' ): 
+		out_log  = __salt__['cmd.run']('mkdir -p /home/ceph/cluster_config/', output_loglevel='debug', runas='ceph' )
+
+	if not salt_utils.istextfile( '/home/ceph/cluster_config/ceph.conf' ):
+		out_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/cluster_config/' )
+
+	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/cluster_config/' )
+		
+	out_log  = __salt__['cmd.run']('ceph-deploy admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/cluster_config/' )
 	return True
 
 
