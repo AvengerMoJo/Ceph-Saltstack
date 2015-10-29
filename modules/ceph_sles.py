@@ -8,6 +8,7 @@
 # Import Python libs for logging
 import logging
 import os
+import re
 
 # Import salt library for running remote commnad
 import salt.modules.cmdmod as salt_cmd
@@ -29,10 +30,13 @@ def __virtual__():
 		log.info('Error ssh-keygen package not find, need to be installed' )
 		return False
 	if not salt_utils.which('ssh-keyscan') :
-		log.info('Error sshpass package not find, need to be installed' )
+		log.info('Error ssh-keyscan package not find, need to be installed' )
 		return False
 	if not salt_utils.which('sshpass') :
 		log.info('Error sshpass package not find, need to be installed' )
+		return False
+	if not salt_utils.which('lsblk') :
+		log.info('Error lsblk package not find, need to be installed' )
 		return False
 	return __virtual_name__
 	# return 'ceph_sles'
@@ -96,4 +100,30 @@ def ceph_new( *node_names ):
 	out_log  = __salt__['cmd.run']('ceph-deploy admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/cluster_config/' )
 	return True
 
+
+def get_disk():
+	'''
+	Get all the disk device from nodes 
+
+        CLI Example:
+
+        ..  code-block:: bash
+                salt 'node1' ceph_sles.get_disk 
+        '''
+	result = __salt__['cmd.run']('lsblk | grep ^sd*', output_loglevel='debug')
+	dev_names = re.findall( r'(?P<disk_name>sd.).*', result )
+	hdd_list = []
+	ssd_list = []
+	for dev_name in dev_names:
+		cat_out = __salt__['cmd.run']('cat /sys/block/'+ dev_name +'/queue/rotational', output_loglevel='debug')
+		if cat_out[0] is "1":
+			hdd_list.append( dev_name )
+			result = re.sub(r'('+dev_name+'.*)disk', r'\1hdd disk', result) 
+		else:
+			ssd_list.append( dev_name )
+			result = re.sub(r'('+dev_name+'.*)disk', r'\1ssd disk', result) 
+	out_log = result
+	out_log = out_log + "\nhdd: \n" + ",".join(hdd_list)
+	out_log = out_log + "\nssd: \n" + ",".join(ssd_list)
+	return out_log
 
