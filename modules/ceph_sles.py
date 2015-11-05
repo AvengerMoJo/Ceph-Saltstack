@@ -59,7 +59,7 @@ def keygen():
 
 	out_log  = __salt__['cmd.run_stdout']('ssh-keygen -b 2048 -t rsa -f /home/ceph/.ssh/id_rsa -q -N ""', output_loglevel='debug', runas='ceph' )
 	# sshkey = salt_cmd.run('ssh-keygen', output_loglevel='debug', runas='ceph')
-	return True
+	return out_log
 
 
 def send_key( *node_names ):
@@ -78,8 +78,6 @@ def send_key( *node_names ):
 		out_log  = __salt__['cmd.run_stdout']('sshpass -p "suse1234" ssh-copy-id ceph@'+node , output_loglevel='debug', runas='ceph' )
 	return True
 
-
-
 def ceph_new( *node_names ):
 	'''
         Create new ceph cluster configuration by running ceph-deploy new, mon
@@ -89,22 +87,35 @@ def ceph_new( *node_names ):
 
         ..  code-block:: bash
                 salt 'node1' ceph_sles.ceph_new node1 node2 node3 ....
-        '''
+    '''
 	node_list = '' 
 	for node in node_names :
 		node_list = node_list + node + ' '
 	
 	if not os.path.exists( '/home/ceph/cluster_config' ): 
-		out_log  = __salt__['cmd.run']('mkdir -p /home/ceph/.ceph_sles_cluster_config', output_loglevel='debug', runas='ceph' )
+		mkdir_log  = __salt__['cmd.run']('mkdir -p /home/ceph/.ceph_sles_cluster_config', output_loglevel='debug', runas='ceph' )
 
 	if not salt_utils.istextfile( '/home/ceph/.ceph_sles_cluster_config/ceph.conf' ):
-		out_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+		deploy_new_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 
 	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 		
-	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
-	return True
+	return mkdir_log + deploy_new_log + out_log
 
+def ceph_push( *node_names ):
+	'''
+        Send cluster configuration file from to all needed nodes
+
+        CLI Example:
+
+        ..  code-block:: bash
+                salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
+    '''
+	node_list = '' 
+	for node in node_names :
+		node_list = node_list + node + ' '
+	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+    return out_log
 
 def get_disk():
 	'''
