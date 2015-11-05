@@ -95,14 +95,14 @@ def ceph_new( *node_names ):
 		node_list = node_list + node + ' '
 	
 	if not os.path.exists( '/home/ceph/cluster_config' ): 
-		out_log  = __salt__['cmd.run']('mkdir -p /home/ceph/cluster_config/', output_loglevel='debug', runas='ceph' )
+		out_log  = __salt__['cmd.run']('mkdir -p /home/ceph/.ceph_sles_cluster_config', output_loglevel='debug', runas='ceph' )
 
-	if not salt_utils.istextfile( '/home/ceph/cluster_config/ceph.conf' ):
-		out_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/cluster_config/' )
+	if not salt_utils.istextfile( '/home/ceph/.ceph_sles_cluster_config/ceph.conf' ):
+		out_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 
-	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/cluster_config/' )
+	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 		
-	out_log  = __salt__['cmd.run']('ceph-deploy admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/cluster_config/' )
+	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return True
 
 
@@ -141,7 +141,7 @@ def clean_node_disk_partition( node_name, disk_dev ):
         ..  code-block:: bash
                 salt 'node1' ceph_sles.clean_node_disk_partition nodename /dev/sda 
     '''
-    disk_zap = __salt__['cmd.run']('ceph-deploy disk zap ' + node_name + ':' + disk_dev , output_loglevel='debug')
+    disk_zap = __salt__['cmd.run']('ceph-deploy disk zap ' + node_name + ':' + disk_dev , output_loglevel='debug', cmd='/home/ceph/.ceph_sles_cluster_config' )
     return disk_zap
 
 
