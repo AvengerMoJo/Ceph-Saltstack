@@ -145,7 +145,7 @@ def get_network( master_node ):
 
     if node_name == master_node:
         iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -s', output_loglevel='debug')
-    else
+    else:
         iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -c ' + master_node + ' -d' , output_loglevel='debug')
 
     return iperf_out 
