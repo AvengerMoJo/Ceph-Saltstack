@@ -8,6 +8,7 @@
 # Import Python libs for logging
 import logging
 import os
+import socket
 import re
 
 # Import salt library for running remote commnad
@@ -37,6 +38,9 @@ def __virtual__():
 		return False
 	if not salt_utils.which('lsblk') :
 		log.info('Error lsblk package not find, need to be installed' )
+		return False
+	if not salt_utils.which('iperf3') :
+		log.info('Error iperf3 package not find, need to be installed' )
 		return False
 	return __virtual_name__
 	# return 'ceph_sles'
@@ -126,4 +130,25 @@ def get_disk():
 	out_log = out_log + "\nhdd: \n" + ",".join(hdd_list)
 	out_log = out_log + "\nssd: \n" + ",".join(ssd_list)
 	return out_log
+
+def get_network( master_node ):
+    '''
+    Get all the disk device from nodes
+
+        CLI Example:
+
+        ..  code-block:: bash
+                salt 'node1' ceph_sles.get_network admin_node node1 node2 node3 ... 
+    '''
+
+    node_name = socket.gethostname()
+
+    if node_name == master_node:
+        iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -s', output_loglevel='debug')
+    else
+        iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -c ' + master_node + ' -d' , output_loglevel='debug')
+
+    return iperf_out 
+
+
 
