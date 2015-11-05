@@ -8,8 +8,9 @@
 # Import Python libs for logging
 import logging
 import os
-import socket
 import re
+import socket
+import time
 
 # Import salt library for running remote commnad
 import salt.modules.cmdmod as salt_cmd
@@ -131,6 +132,19 @@ def get_disk():
 	out_log = out_log + "\nssd: \n" + ",".join(ssd_list)
 	return out_log
 
+def clean_node_disk_partition( node_name, disk_dev ):
+    '''
+    Remove disk partition table 
+
+        CLI Example:
+
+        ..  code-block:: bash
+                salt 'node1' ceph_sles.clean_node_disk_partition nodename /dev/sda 
+    '''
+    disk_zap = __salt__['cmd.run']('ceph-deploy disk zap ' + node_name + ':' + disk_dev , output_loglevel='debug')
+    return disk_zap
+
+
 def get_network( master_node ):
     '''
     Get all the disk device from nodes
@@ -146,6 +160,7 @@ def get_network( master_node ):
     if node_name == master_node:
         iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -s', output_loglevel='debug')
     else:
+        time.sleep(5) # delays for 5 seconds
         iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -c ' + master_node + ' -d' , output_loglevel='debug')
 
     return iperf_out 
