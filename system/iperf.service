@@ -1,0 +1,13 @@
+[Unit]
+Description=iperf network bench service
+After=network.target
+
+[Service]
+Type=simple
+User=ceph
+ExecStart=/usr/bin/iperf3 -s
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
+
