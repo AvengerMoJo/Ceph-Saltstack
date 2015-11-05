@@ -99,7 +99,6 @@ def ceph_new( *node_names ):
 		deploy_new_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 
 	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
-		
 	return mkdir_log + deploy_new_log + out_log
 
 def ceph_push( *node_names ):
@@ -112,9 +111,9 @@ def ceph_push( *node_names ):
                 salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
     '''
 	node_list = '' 
-	for node in node_names :
-		node_list = node_list + node + ' '
-	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	for node in node_names:
+    node_list = node_list + node + ' '
+    out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
     return out_log
 
 def get_disk():
