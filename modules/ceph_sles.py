@@ -75,7 +75,7 @@ def send_key( *node_names ):
 	for node in node_names :
 		out_log  = __salt__['cmd.run_stdout']('ssh-keyscan '+ node +' >> ~/.ssh/known_hosts'  , output_loglevel='debug', runas='ceph' )
 		# assume the kiwi image predefine user ceph with password suse1234
-		out_log  = __salt__['cmd.run_stdout']('sshpass -p "suse1234" ssh-copy-id ceph@'+node , output_loglevel='debug', runas='ceph' )
+		out_log  += __salt__['cmd.run_stdout']('sshpass -p "suse1234" ssh-copy-id ceph@'+node , output_loglevel='debug', runas='ceph' )
 	return True
 
 def ceph_new( *node_names ):
