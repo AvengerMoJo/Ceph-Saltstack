@@ -96,7 +96,7 @@ def ceph_new( *node_names ):
 		mkdir_log  = __salt__['cmd.run']('mkdir -p /home/ceph/.ceph_sles_cluster_config', output_loglevel='debug', runas='ceph' )
 
 	if not salt_utils.istextfile( '/home/ceph/.ceph_sles_cluster_config/ceph.conf' ):
-		deploy_new_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+        deploy_new_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 
 	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return mkdir_log + deploy_new_log + out_log
@@ -110,9 +110,9 @@ def ceph_push( *node_names ):
         ..  code-block:: bash
                 salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
     '''
-	node_list = '' 
-	for node in node_names:
-    node_list = node_list + node + ' '
+    node_list = '' 
+    for node in node_names:
+        node_list = node_list + node + ' '
     out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
     return out_log
 
