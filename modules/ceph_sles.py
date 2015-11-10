@@ -47,6 +47,101 @@ def __virtual__():
 	return __virtual_name__
 	# return 'ceph_sles'
 
+def _parted_start( dev ):
+	'''
+	get disk partition free sector start number 
+	'''
+	start = __salt__['cmd.run']('parted -m -s ' + dev +
+		' unit s print free | grep free  | sort -t : -k 4n -k 2n  | tail -n 1 | cut -f 2 -d ":" | cut -f 1 -d "s" ', output_loglevel='debug' )
+	return int(start)
+
+def _disk_sector_size( dev ):
+	'''
+	get disk sector size 
+	'''
+	# lsblk /dev/sda -o PHY-SEC,LOG-SEC
+	# /sys/block/sda/queue/hw_sector_size
+	size = __salt__['cmd.run']('lsblk ' + dev + ' -o LOG-SEC | head -n 2 | tail -n 1', output_loglevel='debug' )
+	return int(size)
+
+def _disk_last_part( dev ):
+	'''
+	get disk highest partition number 
+	'''
+	part = __salt__['cmd.run']('parted ' + dev + ' print -m -s | tail -1 | cut -f 1 -d ":"', output_loglevel='debug' )
+	if part.isdigit():
+		return int(part)
+	else:
+		return False
+
+def _disk_remove_last_part( dev ):
+	'''
+	remove the highest partition
+	'''
+	part = _disk_last_part( dev )
+	if part:
+		remove_part = __salt__['cmd.run']('parted ' + dev + ' rm ' + str(part), output_loglevel='debug' )
+
+def _disk_new_part( dev, part_size ):
+	'''
+	create a partition in the top partition with size in MB or GB 
+	'''
+	size_string = part_size 
+	sector_size = _disk_sector_size( dev )
+	unit_size = 1024 * 1024
+	temp = "" 
+
+	start = _parted_start( dev )
+	if start < 2048:
+		start = 2048
+	elif start % sector_size != 0:
+		start = ((start / sector_size) + 1) * sector_size
+	
+	for size in str(size_string):
+		if size.isdigit():
+			temp += size
+		elif size == 'G':
+			unit_size = 1024 * unit_size
+	end = (int(temp) * unit_size / sector_size) + start -1
+
+	if start > 0:
+		__salt__['cmd.run']('parted -a optimal -m -s ' + dev + ' unit s -- mkpart primary ' + str(start) + ' ' + str(end), output_loglevel='debug' )
+		__salt__['cmd.run']('partprobe ' + dev, output_loglevel='debug' )
+
+def _disk_part_label( dev ):
+	'''
+	get partition name for mount dev id in suse udev default fstab format
+	'''
+	disk_id = __salt__['cmd.run']('/usr/lib/udev/ata_id ' + dev, output_loglevel='debug')
+	return 'ata-' + disk_id + '-part'
+
+def _disk_format_xfs( dev_part ):
+	'''
+	format partition to xfs format
+	'''
+	format_part = __salt__['cmd.run']('/usr/sbin/mkfs.xfs -f ' + dev_part , output_loglevel='debug')
+	return format_part
+
+def _fstab_remove_part( part ):
+	'''
+	remove partition mount point from fstab
+	'''
+	cp_fstab= __salt__['cmd.run']('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug' )
+	remove_part = __salt__['cmd.run']('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab', output_loglevel='debug' )
+
+def _fstab_update_part( part, path ):
+	'''
+	put in the new partition and mount point into fstab
+	'''
+	_fstab_remove_part( part )
+	add_part = __salt__['cmd.run']('echo "/dev/disk/by-id/' + part + ' ' + path +
+	' xfs	rw,defaults,noexec,nodev,noatime,nodiratime,nobarrier 0 0  ">> /etc/fstab', output_loglevel='debug' )
+
+def _prep_activate_osd( node, part, journal ):
+	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	return prep+activate
+
 def keygen(): 
 	'''
 	Create ssh key from the admin node Admin node should be the one running
@@ -83,7 +178,7 @@ def send_key( *node_names ):
 		out_log.append( __salt__['cmd.run']('sshpass -p "suse1234" ssh-copy-id ceph@'+node , output_loglevel='debug', runas='ceph' ))
 	return out_log
 
-def ceph_new( *node_names ):
+def new_mon( *node_names ):
 	'''
         Create new ceph cluster configuration by running ceph-deploy new, mon
 	create-initial, admin 
@@ -106,7 +201,7 @@ def ceph_new( *node_names ):
 	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return mkdir_log + deploy_new_log + out_log
 
-def ceph_push( *node_names ):
+def push_conf( *node_names ):
 	'''
         Send cluster configuration file from to all needed nodes
 
@@ -209,66 +304,6 @@ def clean_disk_partition( nodelist=None, partlist=None):
 			 ':' + part , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return disk_zap
 
-def _parted_start( dev ):
-	start = __salt__['cmd.run']('parted -m -s ' + dev +
-		' unit s print free | grep free  | sort -t : -k 4n -k 2n  | tail -n 1 | cut -f 2 -d ":" | cut -f 1 -d "s" ', output_loglevel='debug' )
-	return int(start)
-
-def _disk_sector_size( dev ):
-	# lsblk /dev/sda -o PHY-SEC,LOG-SEC
-	# /sys/block/sda/queue/hw_sector_size
-	size = __salt__['cmd.run']('lsblk ' + dev + ' -o LOG-SEC | head -n 2 | tail -n 1', output_loglevel='debug' )
-	return int(size)
-
-def _disk_last_part( dev ):
-	part = __salt__['cmd.run']('parted ' + dev + ' print -m -s | tail -1 | cut -f 1 -d ":"', output_loglevel='debug' )
-	if part.isdigit():
-		return int(part)
-	else:
-		return False
-
-def _disk_remove_last_part( dev ):
-	part = _disk_last_part( dev )
-	if part:
-		remove_part = __salt__['cmd.run']('parted ' + dev + ' rm ' + str(part), output_loglevel='debug' )
-
-def _disk_new_part( dev, part_size ):
-
-	size_string = part_size 
-	sector_size = _disk_sector_size( dev )
-	unit_size = 1024 * 1024
-	temp = "" 
-
-	start = _parted_start( dev )
-	if start < 2048:
-		start = 2048
-	elif start % sector_size != 0:
-		start = ((start / sector_size) + 1) * sector_size
-	
-	for size in str(size_string):
-		if size.isdigit():
-			temp += size
-		elif size == 'G':
-			unit_size = 1024 * unit_size
-	end = (int(temp) * unit_size / sector_size) + start -1
-
-	if start > 0:
-		__salt__['cmd.run']('parted -a optimal -m -s ' + dev + ' unit s -- mkpart primary ' + str(start) + ' ' + str(end), output_loglevel='debug' )
-		__salt__['cmd.run']('partprobe ' + dev, output_loglevel='debug' )
-
-def _disk_part_label( dev ):
-	disk_id = __salt__['cmd.run']('/usr/lib/udev/ata_id ' + dev, output_loglevel='debug')
-	return 'ata-' + disk_id + '-part'
-
-def _disk_format_xfs( dev_part ):
-	format_part = __salt__['cmd.run']('/usr/sbin/mkfs.xfs ' + dev_part , output_loglevel='debug')
-	return format_part
-
-def _fstab_update_part( part, path ):
-	cp_fstab= __salt__['cmd.run']('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug' )
-	remove_part = __salt__['cmd.run']('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab', output_loglevel='debug' )
-	add_part = __salt__['cmd.run']('echo "/dev/disk/by-id/' + part + ' ' + path + ' xfs	rw,defaults,noexec,nodev,noatime,nodiratime,nobarrier 0 0  ">> /etc/fstab', output_loglevel='debug' )
-
 def prep_osd_journal( partition_dev, part_size ):
 	'''
 	Create disk partition for future OSD jounral, it will be using the a new partition
@@ -298,13 +333,6 @@ def prep_osd_journal( partition_dev, part_size ):
 	new_part_mount += "\n\n"
 	new_part_mount += __salt__['cmd.run']('mount', output_loglevel='debug' )
 	return new_part_mount
-
-def _prep_activate_osd( node, part, journal ):
-	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
-	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
-	return prep+activate
-
-
 
 def prep_osd( nodelist=None, partlist=None):
 	'''
