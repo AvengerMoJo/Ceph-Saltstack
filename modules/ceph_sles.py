@@ -11,6 +11,7 @@ import os
 import re
 import socket
 import time
+import getopt
 
 # Import salt library for running remote commnad
 import salt.modules.cmdmod as salt_cmd
@@ -187,20 +188,25 @@ def bench_network( master_node, *client_node ):
 	return iperf_out 
 
 
-def clean_disk_partition( *disk_dev ):
+def clean_disk_partition( nodelist=None, partlist=None):
 	'''
 	Remove disk partition table 
 
 	CLI Example:
 
 	..  code-block:: bash
-		salt 'node1' ceph_sles.clean_disk_partition /dev/sdb /dev/sdb /dev/sdc ...
+		salt 'node1' ceph_sles.clean_disk_partition "node1,node2,node3" "/dev/sdb,/dev/sdc,/dev/sde"
 	'''
 	node_name = socket.gethostname()
-	disk_zap = dev_list = '' 
-	for dev in disk_dev:
-		if __salt__['file.is_blkdev'](dev):
-			disk_zap += __salt__['cmd.run']('ceph-deploy disk zap ' + node_name + ':' + dev , output_loglevel='debug', cwd='/etc/ceph' )
+	node_list = nodelist.split(",")
+	part_list = partlist.split(",")
+	disk_zap = ""
+
+	for node in node_list:
+		# if __salt__['file.is_blkdev'](dev):
+		for part in part_list:
+			disk_zap += __salt__['cmd.run']('ceph-deploy disk zap ' + node +
+			 ':' + part , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return disk_zap
 
 def _parted_start( dev ):
@@ -247,7 +253,8 @@ def _disk_new_part( dev, part_size ):
 	end = (int(temp) * unit_size / sector_size) + start -1
 
 	if start > 0:
-		part_free = __salt__['cmd.run']('parted -a optimal -m -s ' + dev + ' unit s -- mkpart primary ' + str(start) + ' ' + str(end), output_loglevel='debug' )
+		__salt__['cmd.run']('parted -a optimal -m -s ' + dev + ' unit s -- mkpart primary ' + str(start) + ' ' + str(end), output_loglevel='debug' )
+		__salt__['cmd.run']('partprobe ' + dev, output_loglevel='debug' )
 
 def _disk_part_label( dev ):
 	disk_id = __salt__['cmd.run']('/usr/lib/udev/ata_id ' + dev, output_loglevel='debug')
@@ -291,4 +298,49 @@ def prep_osd_journal( partition_dev, part_size ):
 	new_part_mount += "\n\n"
 	new_part_mount += __salt__['cmd.run']('mount', output_loglevel='debug' )
 	return new_part_mount
+
+def _prep_activate_osd( node, part, journal ):
+	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	return prep+activate
+
+
+def prep_osd( nodelist=None, partlist=None):
+	'''
+	Prepare all the osd and activate them 
+
+	CLI Example:
+
+	..  code-block:: bash
+		salt 'node1' ceph_sles.prep_osd "node1,node2,node3" "/dev/sda5,/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde"
+	'''
+	journal_path = '/var/lib/ceph/osd/journal/osd-'
+	result = ""
+	osd_num = 0
+	node_list = nodelist.split(",")
+	part_list = partlist.split(",")
+
+	for node in node_list:
+		for part in part_list:
+			result += _prep_activate_osd( node, part, journal_path+str(osd_num))
+			osd_num += 1
+	return result
+
+def remove_osd( *osd_num ):
+	'''
+	Remove osd from the cluster 
+
+	CLI Example:
+
+	..  code-block:: bash
+		salt 'node1' ceph_sles.remove_osd 0 1 2 3 
+	'''
+	remove = "" 
+	for osd in osd_num:
+		remove += __salt__['cmd.run']('ceph osd down osd.'+ str(osd), output_loglevel='debug', cwd='/etc/ceph' )
+		remove += __salt__['cmd.run']('ceph osd crush remove osd.'+ str(osd), output_loglevel='debug', cwd='/etc/ceph' )
+		remove += __salt__['cmd.run']('ceph auth del osd.'+ str(osd), output_loglevel='debug', cwd='/etc/ceph' )
+		remove += __salt__['cmd.run']('ceph osd rm '+ str(osd), output_loglevel='debug', cwd='/etc/ceph' )
+
+	return remove
 
