@@ -305,6 +305,7 @@ def _prep_activate_osd( node, part, journal ):
 	return prep+activate
 
 
+
 def prep_osd( nodelist=None, partlist=None):
 	'''
 	Prepare all the osd and activate them 
@@ -325,6 +326,26 @@ def prep_osd( nodelist=None, partlist=None):
 			result += _prep_activate_osd( node, part, journal_path+str(osd_num))
 			osd_num += 1
 	return result
+
+def list_osd():
+	'''
+	List out all the osd is mounted and running 
+
+	CLI Example:
+
+	..  code-block:: bash
+		salt 'node1' ceph_sles.list_osd 
+	'''
+	osd_path = '/var/lib/ceph/osd/'
+	possible_osd = __salt__['cmd.run']('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
+	osd_list = possible_osd.split("\n")
+	mounted_osd = ""
+
+	for osd in osd_list:
+		if osd:
+			mounted_osd += "\n" + __salt__['cmd.run']('mount | grep ' + osd + '| cut -f 3 -d " "' , output_loglevel='debug')
+
+	return "Possible OSD is not clean in " + osd_path + ":\n" + osd_list[0] + "\n\nCurrently mounted osd :\n" + mounted_osd
 
 def remove_osd( *osd_num ):
 	'''
