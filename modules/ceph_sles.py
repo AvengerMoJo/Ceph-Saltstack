@@ -149,8 +149,8 @@ def keygen():
 
 	CLI Example:
 
-	..  code-block:: bash
-		salt 'node1' ceph_sles.keygen
+	.. code-block:: bash
+	salt 'node1' ceph_sles.keygen
 	'''
 
 	out_log  = __salt__['cmd.run']('ssh-keygen -b 2048 -t rsa -f /home/ceph/.ssh/id_rsa -q -N ""', output_loglevel='debug', runas='ceph' )
@@ -163,12 +163,12 @@ def send_key( *node_names ):
         Send ssh key from the admin node to the rest of the node allow 
         ceph-deploy in the future
 
-        CLI Example:
+	CLI Example:
 
-        ..  code-block:: bash
-                salt 'node1' ceph_sles.send_key node1 node2 node3 ....
+	.. code-block:: bash
+	salt 'node1' ceph_sles.send_key node1 node2 node3 ....
+
         '''
-
 	out_log = []
 	for node in node_names :
 		out_log.append( __salt__['cmd.run']('ssh-keygen -R '+ socket.gethostbyname(node), output_loglevel='debug', runas='ceph' ))
@@ -183,12 +183,12 @@ def new_mon( *node_names ):
         Create new ceph cluster configuration by running ceph-deploy new, mon
 	create-initial, admin 
 
-        CLI Example:
+	CLI Example:
 
-        ..  code-block:: bash
-                salt 'node1' ceph_sles.ceph_new node1 node2 node3 ....
+	.. code-block:: bash
+	salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
 	'''
-	node_list = '' 
+	node_list = ''
 	for node in node_names :
 		node_list = node_list + node + ' '
 	
@@ -205,10 +205,10 @@ def push_conf( *node_names ):
 	'''
         Send cluster configuration file from to all needed nodes
 
-        CLI Example:
+	CLI Example:
 
-        ..  code-block:: bash
-                salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
+	.. code-block:: bash
+	salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
 	'''
 	node_list = ''
 	for node in node_names:
@@ -220,10 +220,10 @@ def get_disk_info():
 	'''
 	Get all the disk device from nodes 
 
-        CLI Example:
+	CLI Example:
 
-        ..  code-block:: bash
-                salt 'node1' ceph_sles.get_disk_info 
+	.. code-block:: bash
+	salt 'node1' ceph_sles.get_disk_info 
         '''
 	result = __salt__['cmd.run']('lsblk | grep ^sd*', output_loglevel='debug')
 	dev_names = re.findall( r'(?P<disk_name>sd.).*', result )
@@ -244,18 +244,18 @@ def get_disk_info():
 
 def bench_disk( *disk_dev ):
 	'''
-	Get disk device direct read performance 
+	Get disk device direct read performance
 
-        CLI Example:
+	CLI Example:
 
-        ..  code-block:: bash
-                salt 'node1' ceph_sles.bench_disk
+	.. code-block:: bash
+	salt 'node1' ceph_sles.bench_disk
         '''
 	dev_list = '' 
 	for dev in disk_dev:
 		if __salt__['file.is_blkdev'](dev):
 			dev_list = dev_list + dev + ' '
-	result = __salt__['cmd.run']('/sbin/hdparm -T ' + dev_list , output_loglevel='debug')
+	result = __salt__['cmd.run']('/sbin/hdparm -t ' + dev_list , output_loglevel='debug')
 	return result
 
 
@@ -265,8 +265,8 @@ def bench_network( master_node, *client_node ):
 
 	CLI Example:
 
-	..  code-block:: bash
-		salt 'node*' ceph_sles.bench_network admin_node node1 node2 node3 ... 
+	.. code-block:: bash
+	salt 'node*' ceph_sles.bench_network admin_node node1 node2 node3 ... 
 	'''
 
 	iperf_out = False
@@ -289,8 +289,8 @@ def clean_disk_partition( nodelist=None, partlist=None):
 
 	CLI Example:
 
-	..  code-block:: bash
-		salt 'node1' ceph_sles.clean_disk_partition "node1,node2,node3" "/dev/sdb,/dev/sdc,/dev/sde"
+	.. code-block:: bash
+	salt 'node1' ceph_sles.clean_disk_partition "node1,node2,node3" "/dev/sdb,/dev/sdc,/dev/sde"
 	'''
 	node_name = socket.gethostname()
 	node_list = nodelist.split(",")
@@ -311,8 +311,9 @@ def prep_osd_journal( partition_dev, part_size ):
 
 	CLI Example:
 
-	..  code-block:: bash
-		salt 'node1' ceph_sles.prep_osd_journal /dev/sda 40G 
+	.. code-block:: bash
+	salt 'node1' ceph_sles.prep_osd_journal /dev/sda 40G 
+
 	'''
 	journal_path = '/var/lib/ceph/osd/journal'
 	_disk_new_part( partition_dev, part_size )
@@ -340,8 +341,9 @@ def prep_osd( nodelist=None, partlist=None):
 
 	CLI Example:
 
-	..  code-block:: bash
-		salt 'node1' ceph_sles.prep_osd "node1,node2,node3" "/dev/sda5,/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde"
+	.. code-block:: bash
+	salt 'node1' ceph_sles.prep_osd "node1,node2,node3" "/dev/sda5,/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde"
+
 	'''
 	journal_path = '/var/lib/ceph/osd/journal/osd-'
 	result = ""
@@ -361,8 +363,8 @@ def list_osd():
 
 	CLI Example:
 
-	..  code-block:: bash
-		salt 'node1' ceph_sles.list_osd 
+	.. code-block:: bash
+	salt 'node1' ceph_sles.list_osd 
 	'''
 	osd_path = '/var/lib/ceph/osd/'
 	possible_osd = __salt__['cmd.run']('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
@@ -381,8 +383,9 @@ def remove_osd( *osd_num ):
 
 	CLI Example:
 
-	..  code-block:: bash
-		salt 'node1' ceph_sles.remove_osd 0 1 2 3 
+	.. code-block:: bash
+	salt 'node1' ceph_sles.remove_osd 0 1 2 3 
+
 	'''
 	remove = "" 
 	for osd in osd_num:
