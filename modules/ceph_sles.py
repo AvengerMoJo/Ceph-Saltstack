@@ -136,6 +136,22 @@ def _fstab_add_part( part, path ):
 	add_part = __salt__['cmd.run']('echo "/dev/disk/by-id/' + part + ' ' + path +
 	' xfs	rw,defaults,noexec,nodev,noatime,nodiratime,nobarrier 0 0  ">> /etc/fstab', output_loglevel='debug' )
 
+def _ip_info():
+	'''
+	ip -d addr  Profile record for the cluster information
+	'''
+	info = __salt__['cmd.run']('ip -d link', output_loglevel='debug' )
+	info += __salt__['cmd.run']('ip -d addr', output_loglevel='debug' )
+	return "\nip -d a & ip -d l:\n" + info
+
+def _list_osd_files():
+	'''
+	return line seperated list of osd directory in /var/lib/ceph/osd
+	'''
+	osd_path = '/var/lib/ceph/osd/'
+	possible_osd = __salt__['cmd.run']('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
+	return possible_osd
+
 def _lsblk_list_all():
 	'''
 	lsblk -a -O Profile record for the cluster information
@@ -150,14 +166,6 @@ def _lspci():
 	info = __salt__['cmd.run']('lspci ', output_loglevel='debug' )
 	return "\nlspci:\n" + info
 
-def _ip_info():
-	'''
-	ip -d addr  Profile record for the cluster information
-	'''
-	info = __salt__['cmd.run']('ip -d link', output_loglevel='debug' )
-	info += __salt__['cmd.run']('ip -d addr', output_loglevel='debug' )
-	return "\nip -d a & ip -d l:\n" + info
-
 def _parted_start( dev ):
 	'''
 	get disk partition free sector start number 
@@ -171,12 +179,28 @@ def _prep_activate_osd( node, part, journal ):
 	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return prep+activate
 
+def _remove_journal( osd_num ):
+	'''
+	clean up journal file after osd removed
+	'''
+	if os.path.exists( '/var/lib/ceph/osd/journal/osd-' + str(osd_num)):
+		remove_journal = __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(remove_osd), output_loglevel='debug')
+		return True
+	return False
+
 def _scsi_info():
 	'''
 	cat /proc/scsi/scsi disk profile record for the cluster information
 	'''
 	info = __salt__['cmd.run']('cat /proc/scsi/scsi', output_loglevel='debug' )
 	return "\n/proc/scsi/scsi:\n" + info
+
+def _umount_path( path ):
+	'''
+	umount the mount point by the path 
+	'''
+	umount = __salt__['cmd.run']('umount '+ path, output_loglevel='debug')
+	return umount
 
 def keygen(): 
 	'''
@@ -252,32 +276,6 @@ def push_conf( *node_names ):
 	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return out_log
 
-def get_disk_info():
-	'''
-	Get all the disk device from nodes 
-
-	CLI Example:
-
-	.. code-block:: bash
-	salt 'node1' ceph_sles.get_disk_info 
-        '''
-	result = __salt__['cmd.run']('lsblk | grep ^sd*', output_loglevel='debug')
-	dev_names = re.findall( r'(?P<disk_name>sd.).*', result )
-	hdd_list = []
-	ssd_list = []
-	for dev_name in dev_names:
-		cat_out = __salt__['cmd.run']('cat /sys/block/'+ dev_name +'/queue/rotational', output_loglevel='debug')
-		if cat_out[0] is "1":
-			hdd_list.append( dev_name )
-			result = re.sub(r'('+dev_name+'.*)disk', r'\1hdd disk', result) 
-		else:
-			ssd_list.append( dev_name )
-			result = re.sub(r'('+dev_name+'.*)disk', r'\1ssd disk', result) 
-	out_log = result
-	#out_log = out_log + "\nhdd: \n" + ",".join(hdd_list)
-	#out_log = out_log + "\nssd: \n" + ",".join(ssd_list)
-	return out_log
-
 def bench_disk( *disk_dev ):
 	'''
 	Get disk device direct read performance
@@ -340,6 +338,32 @@ def clean_disk_partition( nodelist=None, partlist=None):
 			 ':' + part , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return disk_zap
 
+def disk_info():
+	'''
+	Get all the disk device from nodes 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.get_disk_info 
+        '''
+	result = __salt__['cmd.run']('lsblk | grep ^sd*', output_loglevel='debug')
+	dev_names = re.findall( r'(?P<disk_name>sd.).*', result )
+	hdd_list = []
+	ssd_list = []
+	for dev_name in dev_names:
+		cat_out = __salt__['cmd.run']('cat /sys/block/'+ dev_name +'/queue/rotational', output_loglevel='debug')
+		if cat_out[0] is "1":
+			hdd_list.append( dev_name )
+			result = re.sub(r'('+dev_name+'.*)disk', r'\1hdd disk', result) 
+		else:
+			ssd_list.append( dev_name )
+			result = re.sub(r'('+dev_name+'.*)disk', r'\1ssd disk', result) 
+	out_log = result
+	#out_log = out_log + "\nhdd: \n" + ",".join(hdd_list)
+	#out_log = out_log + "\nssd: \n" + ",".join(ssd_list)
+	return out_log
+
 def prep_osd_journal( partition_dev, part_size ):
 	'''
 	Create disk partition for future OSD jounral, it will be using the a new partition
@@ -392,30 +416,6 @@ def prep_osd( nodelist=None, partlist=None):
 			result += _prep_activate_osd( node, part, journal_path+str(osd_num))
 			osd_num += 1
 	return result
-
-def _list_osd_files():
-	'''
-	return line seperated list of osd directory in /var/lib/ceph/osd
-	'''
-	osd_path = '/var/lib/ceph/osd/'
-	possible_osd = __salt__['cmd.run']('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
-	return possible_osd
-
-def _umount_path( path ):
-	'''
-	umount the mount point by the path 
-	'''
-	umount = __salt__['cmd.run']('umount '+ path, output_loglevel='debug')
-	return umount
-
-def _remove_journal( osd_num ):
-	'''
-	clean up journal file after osd removed
-	'''
-	if os.path.exists( '/var/lib/ceph/osd/journal/osd-' + str(osd_num)):
-		remove_journal = __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(remove_osd), output_loglevel='debug')
-		return True
-	return False
 
 def list_osd():
 	'''
