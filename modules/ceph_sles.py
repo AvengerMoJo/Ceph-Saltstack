@@ -47,13 +47,12 @@ def __virtual__():
 	return __virtual_name__
 	# return 'ceph_sles'
 
-def _parted_start( dev ):
+def _cpu_info():
 	'''
-	get disk partition free sector start number 
+	cat /proc/cpuinfo Profile record for the cluster information
 	'''
-	start = __salt__['cmd.run']('parted -m -s ' + dev +
-		' unit s print free | grep free  | sort -t : -k 4n -k 2n  | tail -n 1 | cut -f 2 -d ":" | cut -f 1 -d "s" ', output_loglevel='debug' )
-	return int(start)
+	info = __salt__['cmd.run']('cat /proc/cpuinfo', output_loglevel='debug' )
+	return "\n/proc/cpuinfo:\n" + info
 
 def _disk_sector_size( dev ):
 	'''
@@ -142,7 +141,30 @@ def _lsblk_list_all():
 	lsblk -a -O Profile record for the cluster information
 	'''
 	info = __salt__['cmd.run']('lsblk -a -O', output_loglevel='debug' )
-	return info
+	return "\nlsblk -a -O:\n" + info
+
+def _lspci():
+	'''
+	lspci Profile record for the cluster information
+	'''
+	info = __salt__['cmd.run']('lspci ', output_loglevel='debug' )
+	return "\nlspci:\n" + info
+
+def _ip_info():
+	'''
+	ip -d addr  Profile record for the cluster information
+	'''
+	info = __salt__['cmd.run']('ip -d link', output_loglevel='debug' )
+	info += __salt__['cmd.run']('ip -d addr', output_loglevel='debug' )
+	return "\nip -d a & ip -d l:\n" + info
+
+def _parted_start( dev ):
+	'''
+	get disk partition free sector start number 
+	'''
+	start = __salt__['cmd.run']('parted -m -s ' + dev +
+		' unit s print free | grep free  | sort -t : -k 4n -k 2n  | tail -n 1 | cut -f 2 -d ":" | cut -f 1 -d "s" ', output_loglevel='debug' )
+	return int(start)
 
 def _prep_activate_osd( node, part, journal ):
 	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
@@ -154,7 +176,7 @@ def _scsi_info():
 	cat /proc/scsi/scsi disk profile record for the cluster information
 	'''
 	info = __salt__['cmd.run']('cat /proc/scsi/scsi', output_loglevel='debug' )
-	return info
+	return "\n/proc/scsi/scsi:\n" + info
 
 def keygen(): 
 	'''
@@ -459,3 +481,21 @@ def remove_osd( *osd_num ):
 
 	return remove
 
+
+def profile_node():
+	'''
+	Run a list of private function to get hardware information from the cluster node
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.profile_node
+
+	'''
+	output = _lsblk_list_all()
+	output += _scsi_info()
+	output += _ip_info()
+	output += _lspci()
+	output += _cpu_info()
+	return output
+	
