@@ -137,6 +137,13 @@ def _fstab_add_part( part, path ):
 	add_part = __salt__['cmd.run']('echo "/dev/disk/by-id/' + part + ' ' + path +
 	' xfs	rw,defaults,noexec,nodev,noatime,nodiratime,nobarrier 0 0  ">> /etc/fstab', output_loglevel='debug' )
 
+def _lsblk_list_all():
+	'''
+	lsblk -a -O Profile record for the cluster information
+	'''
+	info = __salt__['cmd.run']('lsblk -a -O', output_loglevel='debug' )
+	return info
+
 def _prep_activate_osd( node, part, journal ):
 	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
@@ -394,11 +401,14 @@ def list_osd():
 	mounted_osd = ""
 	file_list = ""
 
+	if osd_list[0] == "" :
+		return "There is file in osd default path, assume no OSD in this node." 
 	for osd in osd_list:
 		if osd:
 			mounted_osd += "\n" + __salt__['cmd.run']('mount | grep ' + osd + '| cut -f 3 -d " "' , output_loglevel='debug')
+			mounted_osd += "\t" + __salt__['cmd.run']('mount | grep ' + osd + '| cut -f 1 -d " "' , output_loglevel='debug')
 			file_list += "\n" + osd
-	return "Possible OSD is not clean in /var/lib/ceph/osd/ :\n" + file_list + "\n\nCurrently mounted osd :\n" + mounted_osd
+	return "Possible OSD is not clean in /var/lib/ceph/osd/ :\n" + file_list + "\n\nCurrently mounted osd :\t Mount point:\n" + mounted_osd
 
 
 def clean_osd( *osd_num ):
