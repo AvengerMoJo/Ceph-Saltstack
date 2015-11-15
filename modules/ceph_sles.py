@@ -149,6 +149,13 @@ def _prep_activate_osd( node, part, journal ):
 	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return prep+activate
 
+def _scsi_info():
+	'''
+	cat /proc/scsi/scsi disk profile record for the cluster information
+	'''
+	info = __salt__['cmd.run']('cat /proc/scsi/scsi', output_loglevel='debug' )
+	return info
+
 def keygen(): 
 	'''
 	Create ssh key from the admin node Admin node should be the one running
