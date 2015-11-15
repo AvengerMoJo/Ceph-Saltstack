@@ -345,7 +345,7 @@ def disk_info():
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.get_disk_info 
+	salt 'node1' ceph_sles.disk_info 
         '''
 	result = __salt__['cmd.run']('lsblk | grep ^sd*', output_loglevel='debug')
 	dev_names = re.findall( r'(?P<disk_name>sd.).*', result )
