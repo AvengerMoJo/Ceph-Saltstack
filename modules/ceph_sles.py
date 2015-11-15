@@ -129,7 +129,7 @@ def _fstab_remove_part( part ):
 	cp_fstab= __salt__['cmd.run']('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug' )
 	remove_part = __salt__['cmd.run']('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab', output_loglevel='debug' )
 
-def _fstab_update_part( part, path ):
+def _fstab_add_part( part, path ):
 	'''
 	put in the new partition and mount point into fstab
 	'''
@@ -249,7 +249,7 @@ def bench_disk( *disk_dev ):
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.bench_disk
+	salt 'node1' ceph_sles.bench_disk /dev/sda /dev/sdb ...
         '''
 	dev_list = '' 
 	for dev in disk_dev:
@@ -357,6 +357,30 @@ def prep_osd( nodelist=None, partlist=None):
 			osd_num += 1
 	return result
 
+def _list_osd_files():
+	'''
+	return line seperated list of osd directory in /var/lib/ceph/osd
+	'''
+	osd_path = '/var/lib/ceph/osd/'
+	possible_osd = __salt__['cmd.run']('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
+	return possible_osd
+
+def _umount_path( path ):
+	'''
+	umount the mount point by the path 
+	'''
+	umount = __salt__['cmd.run']('umount '+ path, output_loglevel='debug')
+	return umount
+
+def _remove_journal( osd_num ):
+	'''
+	clean up journal file after osd removed
+	'''
+	if os.path.exists( '/var/lib/ceph/osd/journal/osd-' + str(osd_num)):
+		remove_journal = __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(remove_osd), output_loglevel='debug')
+		return True
+	return False
+
 def list_osd():
 	'''
 	List out all the osd is mounted and running 
@@ -366,16 +390,38 @@ def list_osd():
 	.. code-block:: bash
 	salt 'node1' ceph_sles.list_osd 
 	'''
-	osd_path = '/var/lib/ceph/osd/'
-	possible_osd = __salt__['cmd.run']('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
-	osd_list = possible_osd.split("\n")
+	osd_list = _list_osd_files().split("\n")
 	mounted_osd = ""
+	file_list = ""
 
 	for osd in osd_list:
 		if osd:
 			mounted_osd += "\n" + __salt__['cmd.run']('mount | grep ' + osd + '| cut -f 3 -d " "' , output_loglevel='debug')
+			file_list += "\n" + osd
+	return "Possible OSD is not clean in /var/lib/ceph/osd/ :\n" + file_list + "\n\nCurrently mounted osd :\n" + mounted_osd
 
-	return "Possible OSD is not clean in " + osd_path + ":\n" + osd_list[0] + "\n\nCurrently mounted osd :\n" + mounted_osd
+
+def clean_osd( *osd_num ):
+	'''
+	Umount the osd mount point and clean up the host osd leave over files
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node*' ceph_sles.clean_osd 0 1 2 3 
+	'''
+	clean_log = ""
+	for remove_osd in osd_num:
+		for ceph_path in _list_osd_files().split("\n"):
+			mounted = __salt__['cmd.run']('mount | grep "' + ceph_path + '"| grep ceph-' + str(remove_osd) + '| cut -f 3 -d " "', output_loglevel='debug')
+			if mounted:
+				clean_log += 'umount ' + mounted
+				_umount_path( mounted )
+			elif os.path.exists( '/var/lib/ceph/osd/ceph-' + str(remove_osd)):
+				clean_log += 'remove /var/lib/ceph/osd/ceph-' + str(remove_osd)
+				__salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(remove_osd), output_loglevel='debug')
+		clean_log += 'remove journal ' + _remove_journal( remove_osd )
+	return clean_log
 
 def remove_osd( *osd_num ):
 	'''
