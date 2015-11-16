@@ -12,6 +12,8 @@ import re
 import socket
 import time
 import getopt
+import json
+import fileinput
 
 # Import salt library for running remote commnad
 import salt.modules.cmdmod as salt_cmd
@@ -252,7 +254,7 @@ def new_mon( *node_names ):
 	for node in node_names :
 		node_list = node_list + node + ' '
 	
-	if not os.path.exists( '/home/ceph/cluster_config' ): 
+	if not os.path.exists( '/home/ceph/.ceph_sles_cluster_config' ): 
 		mkdir_log  = __salt__['cmd.run']('mkdir -p /home/ceph/.ceph_sles_cluster_config', output_loglevel='debug', runas='ceph' )
 
 	if not salt_utils.istextfile( '/home/ceph/.ceph_sles_cluster_config/ceph.conf' ):
@@ -498,4 +500,233 @@ def profile_node():
 	output += _lspci()
 	output += _cpu_info()
 	return output
+
+def _crushmap_disktype_output( disk_type, next_id, osd_weight_total, osd_weight_line ):
+	'''
+	Run the command from master-admin node to get all disk info and output
+	crushmap output with disktype being listed
+	'''
+	output = "disktype osd_" + disk_type + " {\n" 
+	output += "\tid " + str(next_id) + " # do not change unnecessarily\n"
+	output += "\t# weight " + str( osd_weight_total ) + "\n" 
+	output += "\talg straw\n\thash 0\n" 
+	output += osd_weight_line + "}"
+	return output
+
+def _crushmap_root_disktype_output( disk_type, next_id, osd_weight_total ):
+	output = "root root_" + disk_type + " {\n" 
+	output += "\tid " + str(next_id) + " # do not change unnecessarily\n"
+	output += "\t# weight " + str( osd_weight_total ) + "\n" 
+	output += "\talg straw\n\thash 0\n" 
+	output += "\titem osd_" + disk_type + " weight " + str(osd_weight_total)
+	output += "\n}"
+	return output
+
+def _osd_tree_obj():
+	tree_view_json =  __salt__['cmd.run']('ceph osd tree --format json | grep {', output_loglevel='debug', cwd='/etc/ceph', runas='ceph' )
+	tree_view = json.loads( tree_view_json )
+	return tree_view
+
+def _osd_tree_next_id( osd_tree_json_object ):
+	'''
+	Get the next id from the osd tree for crushmap update
+	it should be the next -1 id form the current lowest id 
+	'''
+	next_id = 0 
+	for child in osd_tree_json_object['nodes']:
+		if next_id > child['id']:
+			next_id = int( child['id'] )
+	next_id -= 1 
+	return next_id
+
+def _osd_tree_osd_weight( osd_tree_json_object, osd_num ):
+	'''
+	Get the osd weight from the osd tree json object for crushmap update by the osd.num
+	it should be the next -1 id form the current lowest id 
+	'''
+	osd_weight = 0.0000
+	for child in osd_tree_json_object['nodes']:
+		if child['name'] == "osd." + str(osd_num):
+			osd_weight = child['crush_weight']
+	return osd_weight
+
+def _parse_disktype( disk_info_result, disktype ):
+	'''
+	Feed disk_info result into the function and extract node disktype line by line
+	'''
+	dev_list = re.findall( r'\s+(\w+)\s+\d+:\d+\s+[0-9]\s+\d+\.\d[G|T]\s+[0|1]\s'+disktype, disk_info_result )
+	return dev_list
+
+def _parse_list_osd( list_osd_result, dev_name ):
+	'''
+	Feed list_osd result into the function and extract osd number line by line
+	'''
+	dev_list = re.findall( r'/var/lib/ceph/osd/ceph-(\d+)\s+.*'+dev_name+'.*', list_osd_result)
+	return dev_list
+
+def crushmap_add_hdd_ssd_tree( *node_names ):
+	'''
+	Run the command from master-admin node to get all ssd osd in the cluster 
+	and then put that into a crushmap format. 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.crushmap_add_hdd_ssd_tree node1 node2 node3 
+
+	'''
+	output = ""
+	ssd_osd_weight_output = ""
+	ssd_osd_weight_total = 0.000
+	hdd_osd_weight_output = ""
+	hdd_osd_weight_total = 0.000
+
+	tree_view_json = _osd_tree_obj()
+	next_id = _osd_tree_next_id( tree_view_json ) 
+
+	for node in node_names:
+		disk_info_result =  __salt__['cmd.run']('salt "' + node + '" ceph_sles.disk_info', output_loglevel='debug' )
+		list_osd_result =  __salt__['cmd.run']('salt "' + node + '" ceph_sles.list_osd', output_loglevel='debug' )
+		ssd_disks =  _parse_disktype( disk_info_result, 'ssd' )
+		if ssd_disks is not None:
+			for ssd_dev in ssd_disks:
+				osd_num_list = _parse_list_osd( list_osd_result, ssd_dev )
+				if osd_num_list is not None:	
+					for osd_num in osd_num_list:
+						weight  = _osd_tree_osd_weight( tree_view_json, osd_num ) 
+						ssd_osd_weight_total += weight
+						ssd_osd_weight_output += "\titem osd."+ str(osd_num) + " weight " + str( weight ) + "\n"
+		hdd_disks =  _parse_disktype( disk_info_result, 'hdd' )
+		if hdd_disks is not None:
+			for hdd_dev in hdd_disks:
+				osd_num_list = _parse_list_osd( list_osd_result, hdd_dev )
+				if osd_num_list is not None:	
+					for osd_num in osd_num_list:
+						#output += "osdnum :"+ osd_num+"\n"
+						weight  = _osd_tree_osd_weight( tree_view_json, osd_num ) 
+						hdd_osd_weight_total += weight
+						hdd_osd_weight_output += "\titem osd."+ str(osd_num) + " weight " + str( weight ) + "\n"
+						# output += " hdd=" + hdd_dev + " osd=osd." + str(osd_num) 
+	crushmap_ssd_out = _crushmap_disktype_output( 'ssd', next_id, ssd_osd_weight_total, ssd_osd_weight_output )
+	output += crushmap_ssd_out 
+	output += "\n\n"
+	crushmap_hdd_out = _crushmap_disktype_output( 'hdd', next_id-1, hdd_osd_weight_total, hdd_osd_weight_output )
+	output += crushmap_hdd_out
+	output += "\n\n"
+	crushmap_root_ssd_out = _crushmap_root_disktype_output( 'ssd', next_id-2, ssd_osd_weight_total )
+	output += crushmap_root_ssd_out 
+	output += "\n\n"
+	crushmap_root_hdd_out = _crushmap_root_disktype_output( 'hdd', next_id-3, hdd_osd_weight_total )
+	output += crushmap_root_hdd_out 
+	output += "\n\n"
+
+	return output
+
+def _prepare_crushmap():
+	'''
+	Create a directory for hold current crushmap configuration and modify later
+	'''
+	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	orig_bin_map = 'orig_crushmap.bin'
+	orig_txt_map = 'orig_crushmap.txt'
+	new_txt_map = 'new_crushmap.txt'
+
+	if not os.path.exists( crushmap_path ):
+		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + crushmap_path, output_loglevel='debug', runas='ceph' )
+
+	prep = __salt__['cmd.run']('ceph osd getcrushmap -o ' + orig_bin_map, output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	prep += __salt__['cmd.run']('crushtool -d ' + orig_bin_map + ' -o ' + orig_txt_map , output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	prep += __salt__['cmd.run']('cp ' + orig_txt_map + ' ' + new_txt_map  , output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+
+	return prep
+
+def _read_crushmap_begin_section( begin_line, end_line ):
+	'''
+	Read the new_crushmap.txt and get the first section 
+	from line e.g. "# begin crush map" to "# devices"
+	'''
+	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	new_txt_map = 'new_crushmap.txt'
+	output = ""
+	in_section = False
+
+	for line in fileinput.input( crushmap_path + '/' + new_txt_map ):
+		if line.startswith( begin_line ):
+			in_section = True
+		if line.startswith( end_line ):
+			in_section = False
+		if in_section:
+			output += line
+
+	return output
+
+def _update_crushmap():
+	'''
+	Compile and install the new crushmap into the cluster 
+	'''
+	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	new_txt_map = 'new_crushmap.txt'
+	new_bin_map = 'new_crushmap.bin'
+
+	prep = __salt__['cmd.run']('crushtool -c ' + new_txt_map + ' -o ' + new_bin_map, output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	prep += __salt__['cmd.run']('ceph osd setcrushmap -i ' + new_bin_map, output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+
+	return prep
+
+
+def _crushmap_add_disktype():
+	'''
+	Update types section as following : 
+	'''
+	new_type = "# types\n"
+	new_type += "type 0 osd\n"
+	new_type += "type 1 disktype\n"
+	new_type += "type 2 host\n"
+	new_type += "type 3 chassis\n"
+	new_type += "type 4 rack\n"
+	new_type += "type 5 row\n"
+	new_type += "type 6 pdu\n"
+	new_type += "type 7 pod\n"
+	new_type += "type 8 room\n"
+	new_type += "type 9 datacenter\n"
+	new_type += "type 10 region\n"
+	new_type += "type 11 root\n\n"
+	return new_type
+
+def crushmap_update_disktype_ssd_hdd( *node_names ):
+	'''
+	Run the command from master-admin node
+	1) Prepare crushmap in /home/ceph/.ceph_sles_cluster_config/crushmap
+	2) Add disktype to default crushmap
+	3) Find all node ssd and hdd and group them into root_sdd and root_hdd 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.crushmap_update_disktype_ssd_hdd node1 node2 node3 
+
+	'''
+	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	new_txt_map = 'new_crushmap.txt'
+
+	begin_line = '# begin crush map'
+	type_line = '# types'
+	bucket_line = '# buckets'
+	rule_line = '# rules'
+	end_line = '# end crush map'
 	
+	
+	_prepare_crushmap()
+	before_type = _read_crushmap_begin_section( begin_line, type_line )
+	new_type = _crushmap_add_disktype()
+	bucket_type = _read_crushmap_begin_section( bucket_line, rule_line )
+	bucket_type += crushmap_add_hdd_ssd_tree( *node_names )
+	after_type = _read_crushmap_begin_section( rule_line, end_line )
+	after_type += '\n' + end_line
+
+	new_crushmap = before_type + new_type + bucket_type + after_type
+	new_crushmap_file = open( crushmap_path + '/' + new_txt_map, "w" ) 
+	new_crushmap_file.write( new_crushmap )
+	new_crushmap_file.close()
+
+	return _update_crushmap()
