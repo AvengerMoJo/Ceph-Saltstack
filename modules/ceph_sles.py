@@ -318,6 +318,20 @@ def bench_network( master_node, *client_node ):
 				break
 	return iperf_out 
 
+def bench_test_ruleset( replication_size=3 ):
+	'''
+	Test all the new ruleset with utilization 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node*' ceph_sles.bench_test_ruleset 2 
+	'''
+	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	new_bin_map = 'new_crushmap.bin'
+	utilization = __salt__['cmd.run']('crushtool --test -i ' + new_bin_map + ' --show-utilization --num-rep=' + str(replication_size), output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+
+	return utilization
 
 def clean_disk_partition( nodelist=None, partlist=None):
 	'''
