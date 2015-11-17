@@ -678,20 +678,57 @@ def _crushmap_add_disktype():
 	'''
 	Update types section as following : 
 	'''
-	new_type = "# types\n"
-	new_type += "type 0 osd\n"
-	new_type += "type 1 disktype\n"
-	new_type += "type 2 host\n"
-	new_type += "type 3 chassis\n"
-	new_type += "type 4 rack\n"
-	new_type += "type 5 row\n"
-	new_type += "type 6 pdu\n"
-	new_type += "type 7 pod\n"
-	new_type += "type 8 room\n"
-	new_type += "type 9 datacenter\n"
-	new_type += "type 10 region\n"
-	new_type += "type 11 root\n\n"
+	new_type = '# types\n'
+	new_type += 'type 0 osd\n'
+	new_type += 'type 1 disktype\n'
+	new_type += 'type 2 host\n'
+	new_type += 'type 3 chassis\n'
+	new_type += 'type 4 rack\n'
+	new_type += 'type 5 row\n'
+	new_type += 'type 6 pdu\n'
+	new_type += 'type 7 pod\n'
+	new_type += 'type 8 room\n'
+	new_type += 'type 9 datacenter\n'
+	new_type += 'type 10 region\n'
+	new_type += 'type 11 root\n\n'
 	return new_type
+
+def _crushmap_add_ssd_hdd_ruleset( rule_type, next_ruleset_id, min_size, max_size ):
+	'''
+	Add the following ruleset for pick only ssd or hdd for data placement
+	'''
+	ssd_ruleset = 'rule ssd_' + rule_type + ' {\n'
+	ssd_ruleset += '\truleset ' + str( next_ruleset_id ) + '\n'
+	ssd_ruleset += '\ttype ' + rule_type + '\n'
+	ssd_ruleset += '\tmin_size ' + str( min_size ) + '\n'
+	ssd_ruleset += '\tmax_size ' + str( max_size ) + '\n'
+	ssd_ruleset += '\tstep take root_ssd\n'
+	ssd_ruleset += '\tstep chooseleaf firstn 0 type osd\n'
+	ssd_ruleset += '\tstep emit\n'
+	ssd_ruleset += '}\n'
+
+	hdd_ruleset = 'rule hdd_' + rule_type + ' {\n'
+	hdd_ruleset += '\truleset ' + str( next_ruleset_id+1 )+ '\n'
+	hdd_ruleset += '\ttype ' + rule_type + '\n'
+	hdd_ruleset += '\tmin_size ' + str( min_size ) + '\n'
+	hdd_ruleset += '\tmax_size ' + str( max_size ) + '\n'
+	hdd_ruleset += '\tstep take root_hdd\n'
+	hdd_ruleset += '\tstep chooseleaf firstn 0 type osd\n'
+	hdd_ruleset += '\tstep emit\n'
+	hdd_ruleset += '}\n'
+	
+	return ssd_ruleset + hdd_ruleset
+
+def _read_ruleset_next_id( all_ruleset ):
+	'''
+	Return the max + 1 ruleset id form the crushmap line buffer 
+	'''
+	next_id = 0
+	all_id = re.findall( r'ruleset (?P<id>\d).*', all_ruleset )
+	for rule_id in all_id:
+		if int(rule_id) > next_id:
+			next_id = int( rule_id ) 
+	return next_id + 1
 
 def crushmap_update_disktype_ssd_hdd( *node_names ):
 	'''
@@ -715,16 +752,28 @@ def crushmap_update_disktype_ssd_hdd( *node_names ):
 	rule_line = '# rules'
 	end_line = '# end crush map'
 	
-	
+	# prepare the file of crushmap from the running cluster 
 	_prepare_crushmap()
+	# get the first section of the crushmap text file 
 	before_type = _read_crushmap_begin_section( begin_line, type_line )
+	# add the disktype into the crushmap type list
 	new_type = _crushmap_add_disktype()
-	bucket_type = _read_crushmap_begin_section( bucket_line, rule_line )
-	bucket_type += crushmap_add_hdd_ssd_tree( *node_names )
-	after_type = _read_crushmap_begin_section( rule_line, end_line )
-	after_type += '\n' + end_line
+	# get the bucket section until the ruleset
+	bucket_list = _read_crushmap_begin_section( bucket_line, rule_line )
+	# add the pure ssd and pure hdd bucket 
+	bucket_ssd_hdd = crushmap_add_hdd_ssd_tree( *node_names )
+	# get the ruleset of the curshmap
+	ruleset_list = _read_crushmap_begin_section( rule_line, end_line )
+	# get the highest number of ruleset id + 1 
+	next_ruleset_id = _read_ruleset_next_id( ruleset_list )
+	# let's fix this later, I'm sure there is better way to setup min and max 
+	min_size = 1
+	max_size = 3 
+	# add the ssd and hdd replicated ruleset 
+	ruleset_list += _crushmap_add_ssd_hdd_ruleset( 'replicated', next_ruleset_id, min_size, max_size )
+	ruleset_list += '\n' + end_line + '\n'
 
-	new_crushmap = before_type + new_type + bucket_type + after_type
+	new_crushmap = before_type + new_type + bucket_list + bucket_ssd_hdd + ruleset_list
 	new_crushmap_file = open( crushmap_path + '/' + new_txt_map, "w" ) 
 	new_crushmap_file.write( new_crushmap )
 	new_crushmap_file.close()
