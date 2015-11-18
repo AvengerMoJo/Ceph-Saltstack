@@ -186,9 +186,9 @@ def _remove_journal( osd_num ):
 	clean up journal file after osd removed
 	'''
 	if os.path.exists( '/var/lib/ceph/osd/journal/osd-' + str(osd_num)):
-		remove_journal = __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(remove_osd), output_loglevel='debug')
-		return True
-	return False
+		remove_journal = __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(osd_num), output_loglevel='debug')
+		return 'Journal ' + str( osd_num ) + ' removed\n'
+	return 'No Jornal being removed ' + str( osd_num ) + ' does not exist\n'
 
 def _scsi_info():
 	'''
