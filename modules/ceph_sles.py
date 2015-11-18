@@ -329,7 +329,8 @@ def bench_test_ruleset( replication_size=3 ):
 	'''
 	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
 	new_bin_map = 'new_crushmap.bin'
-	utilization = __salt__['cmd.run']('crushtool --test -i ' + new_bin_map + ' --show-utilization --num-rep=' + str(replication_size), output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	utilization = __salt__['cmd.run']('crushtool --test -i ' + new_bin_map + ' --show-utilization --num-rep=' + str(replication_size),
+	output_loglevel='debug', runas='ceph', cwd=crushmap_path )
 
 	return utilization
 
@@ -353,6 +354,27 @@ def clean_disk_partition( nodelist=None, partlist=None):
 			disk_zap += __salt__['cmd.run']('ceph-deploy disk zap ' + node +
 			 ':' + part , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return disk_zap
+
+def create_pool( pool_name, pg_num, replication_size, ruleset_name='replicated_ruleset', pool_type='replicated' ):
+	'''
+	Create a pool in cluster
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.create_pool ssd_pool_name 100<pg_num> 2<replicate> ruleset_name pooltype<default replicated> 
+	'''
+	create_pool = __salt__['cmd.run']('ceph osd pool create ' + pool_name + ' ' + str(pg_num) + ' ' + pool_type + ' ' + ruleset_name , 
+	output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+
+	create_pool += __salt__['cmd.run']('ceph osd pool set ' + pool_name + ' size ' + str(replication_size),
+	output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+
+	# create_pool = __salt__['cmd.run']('ceph osd pool set ' + pool_name + ' rulsset ' + ruleset_num,
+	# output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+
+	return create_pool
+	
 
 def disk_info():
 	'''
@@ -497,6 +519,17 @@ def remove_osd( *osd_num ):
 
 	return remove
 
+def remove_pool( pool_name ):
+	'''
+	Remove a pool in cluster
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.remove_pool pool_name
+	'''
+	return  __salt__['cmd.run']('ceph osd pool delete ' + pool_name + ' ' + pool_name + '  --yes-i-really-really-mean-it ', 
+	output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 
 def profile_node():
 	'''
