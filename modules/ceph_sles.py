@@ -186,9 +186,9 @@ def _remove_journal( osd_num ):
 	clean up journal file after osd removed
 	'''
 	if os.path.exists( '/var/lib/ceph/osd/journal/osd-' + str(osd_num)):
-		remove_journal = __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(osd_num), output_loglevel='debug')
-		return 'Journal ' + str( osd_num ) + ' removed\n'
-	return 'No Jornal being removed ' + str( osd_num ) + ' does not exist\n'
+		remove_journal = __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/journal/osd-' + str(osd_num), output_loglevel='debug')
+		return  str( osd_num ) + ' removed\n'
+	return 'No Journal being removed ' + str( osd_num ) + ' does not exist\n'
 
 def _scsi_info():
 	'''
@@ -492,11 +492,12 @@ def clean_osd( *osd_num ):
 		for ceph_path in _list_osd_files().split("\n"):
 			mounted = __salt__['cmd.run']('mount | grep "' + ceph_path + '"| grep ceph-' + str(remove_osd) + '| cut -f 3 -d " "', output_loglevel='debug')
 			if mounted:
-				clean_log += 'umount ' + mounted
-				_umount_path( mounted )
-			elif os.path.exists( '/var/lib/ceph/osd/ceph-' + str(remove_osd)):
-				clean_log += 'remove /var/lib/ceph/osd/ceph-' + str(remove_osd)
-				__salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(remove_osd), output_loglevel='debug')
+				clean_log += 'umount ' + mounted + '\n'
+				clean_log += _umount_path( mounted ) + '\n'
+				mounted = False
+			if os.path.exists( '/var/lib/ceph/osd/ceph-' + str(remove_osd)):
+				clean_log += 'remove /var/lib/ceph/osd/ceph-' + str(remove_osd) + '\n'
+				clean_log += __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(remove_osd), output_loglevel='debug')
 		clean_log += 'remove journal ' + _remove_journal( remove_osd )
 	return clean_log
 
@@ -510,12 +511,14 @@ def remove_osd( *osd_num ):
 	salt 'node1' ceph_sles.remove_osd 0 1 2 3 
 
 	'''
+	ceph_conf = '/home/ceph/.ceph_sles_cluster_config'
+	admin_key = 'ceph.client.admin.keyring'
 	remove = "" 
 	for osd in osd_num:
-		remove += __salt__['cmd.run']('ceph osd down osd.'+ str(osd), output_loglevel='debug', cwd='/etc/ceph' )
-		remove += __salt__['cmd.run']('ceph osd crush remove osd.'+ str(osd), output_loglevel='debug', cwd='/etc/ceph' )
-		remove += __salt__['cmd.run']('ceph auth del osd.'+ str(osd), output_loglevel='debug', cwd='/etc/ceph' )
-		remove += __salt__['cmd.run']('ceph osd rm '+ str(osd), output_loglevel='debug', cwd='/etc/ceph' )
+		remove += __salt__['cmd.run']('ceph osd down osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas='ceph', cwd=ceph_conf ) + '\n'
+		remove += __salt__['cmd.run']('ceph osd crush remove osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas='ceph', cwd=ceph_conf ) + '\n'
+		remove += __salt__['cmd.run']('ceph auth del osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas='ceph', cwd=ceph_conf ) + '\n'
+		remove += __salt__['cmd.run']('ceph osd rm '+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas='ceph', cwd=ceph_conf ) + '\n'
 
 	return remove
 
