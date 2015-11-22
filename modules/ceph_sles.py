@@ -14,6 +14,7 @@ import time
 import getopt
 import json
 import fileinput
+import StringIO
 
 # Import salt library for running remote commnad
 import salt.modules.cmdmod as salt_cmd
@@ -614,7 +615,7 @@ def _parse_list_osd( list_osd_result, dev_name ):
 	dev_list = re.findall( r'/var/lib/ceph/osd/ceph-(\d+)\s+.*'+dev_name+'.*', list_osd_result)
 	return dev_list
 
-def crushmap_add_hdd_ssd_tree( *node_names ):
+def _crushmap_add_hdd_ssd_tree( *node_names ):
 	'''
 	Run the command from master-admin node to get all ssd osd in the cluster 
 	and then put that into a crushmap format. 
@@ -684,9 +685,9 @@ def _prepare_crushmap():
 	if not os.path.exists( crushmap_path ):
 		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + crushmap_path, output_loglevel='debug', runas='ceph' )
 
-	prep = __salt__['cmd.run']('ceph osd getcrushmap -o ' + orig_bin_map, output_loglevel='debug', runas='ceph', cwd=crushmap_path )
-	prep += __salt__['cmd.run']('crushtool -d ' + orig_bin_map + ' -o ' + orig_txt_map , output_loglevel='debug', runas='ceph', cwd=crushmap_path )
-	prep += __salt__['cmd.run']('cp ' + orig_txt_map + ' ' + new_txt_map  , output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	prep = "get crushmap:\n" + __salt__['cmd.run']('ceph osd getcrushmap -o ' + orig_bin_map, output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	prep += "create text crushmap:\n" + __salt__['cmd.run']('crushtool -d ' + orig_bin_map + ' -o ' + orig_txt_map , output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	prep += "create new_crushmap.txt:\n" +  __salt__['cmd.run']('cp ' + orig_txt_map + ' ' + new_txt_map  , output_loglevel='debug', runas='ceph', cwd=crushmap_path )
 
 	return prep
 
@@ -709,6 +710,40 @@ def _read_crushmap_begin_section( begin_line, end_line ):
 			output += line
 
 	return output
+
+def _remove_crushmap_bucket_update( bucket_section ):
+	'''
+	Read the old crushmap and get the bucket section and remove 
+	saltstack update disktype osd_ssd {}, disktype osd_hdd {} 
+	and root root_ssd {}, root root_hdd {} 
+	'''
+	# keep that in 2 states 'keep', 'remove', 'remove-end'
+	state = 'keep' 
+	output = ""
+	section = StringIO.StringIO( bucket_section )
+	for line in section:
+		if line.startswith( 'disktype osd_ssd' ) or line.startswith( 'disktype osd_hdd' ) or \
+		line.startswith( 'root root_ssd' ) or line.startswith( 'root root_ssd' ):
+			state = 'remove' 
+		if line.startswith( '}' ):
+			if( state == 'remove' ):
+				state = 'remove-end'
+		if state == 'keep':
+			output += line
+		if state == 'remove-end':
+			state == 'keep'
+	return output
+
+def _read_crushmap_has_ruleset_update( ruleset_section ):
+	'''
+	Read the old crushmap and see the ssd and hdd ruleset already
+	exist, if it does return True or else False
+	'''
+	section = StringIO.StringIO( ruleset_section )
+	for line in section:
+		if line.startswith( 'rule ssd_replicated' ) or line.startswith( 'rule ssd_replicated' ):
+			return True
+	return False
 
 def _update_crushmap():
 	'''
@@ -803,24 +838,30 @@ def crushmap_update_disktype_ssd_hdd( *node_names ):
 	end_line = '# end crush map'
 	
 	# prepare the file of crushmap from the running cluster 
-	_prepare_crushmap()
+	output = _prepare_crushmap()
 	# get the first section of the crushmap text file 
 	before_type = _read_crushmap_begin_section( begin_line, type_line )
 	# add the disktype into the crushmap type list
 	new_type = _crushmap_add_disktype()
 	# get the bucket section until the ruleset
 	bucket_list = _read_crushmap_begin_section( bucket_line, rule_line )
+	# remove if the bucket list has been updated before 
+	bucket_list = _remove_crushmap_bucket_update( bucket_list )
 	# add the pure ssd and pure hdd bucket 
-	bucket_ssd_hdd = crushmap_add_hdd_ssd_tree( *node_names )
+	bucket_ssd_hdd = _crushmap_add_hdd_ssd_tree( *node_names )
 	# get the ruleset of the curshmap
 	ruleset_list = _read_crushmap_begin_section( rule_line, end_line )
-	# get the highest number of ruleset id + 1 
-	next_ruleset_id = _read_ruleset_next_id( ruleset_list )
-	# let's fix this later, I'm sure there is better way to setup min and max 
-	min_size = 1
-	max_size = 3 
-	# add the ssd and hdd replicated ruleset 
-	ruleset_list += _crushmap_add_ssd_hdd_ruleset( 'replicated', next_ruleset_id, min_size, max_size )
+	
+	# if the rule list has been updated before leave it alone 
+	if not _read_crushmap_has_ruleset_update( ruleset_list ):
+		# get the highest number of ruleset id + 1 
+		next_ruleset_id = _read_ruleset_next_id( ruleset_list )
+		# let's fix this later, I'm sure there is better way to setup min and max 
+		min_size = 1
+		max_size = 3 
+		# add the ssd and hdd replicated ruleset 
+		ruleset_list += _crushmap_add_ssd_hdd_ruleset( 'replicated', next_ruleset_id, min_size, max_size )
+
 	ruleset_list += '\n' + end_line + '\n'
 
 	new_crushmap = before_type + new_type + bucket_list + bucket_ssd_hdd + ruleset_list
@@ -828,4 +869,4 @@ def crushmap_update_disktype_ssd_hdd( *node_names ):
 	new_crushmap_file.write( new_crushmap )
 	new_crushmap_file.close()
 
-	return _update_crushmap()
+	return output + _update_crushmap()
