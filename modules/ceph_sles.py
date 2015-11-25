@@ -50,6 +50,17 @@ def __virtual__():
 	return __virtual_name__
 	# return 'ceph_sles'
 
+def _bench_prep():
+	'''
+	Prepare bench report gathering directory 
+	'''
+	bench_path = '/home/ceph/.ceph_sles_bench_report'
+	if not os.path.exists( bench_path ):
+		mkdir_log = __salt__['cmd.run']('mkdir -p ' + bench_path, output_loglevel='debug', runas='ceph' )
+		return mkdir_log 
+	else:
+		return True
+
 def _cpu_info():
 	'''
 	cat /proc/cpuinfo Profile record for the cluster information
@@ -335,6 +346,109 @@ def bench_test_ruleset( replication_size=3 ):
 
 	return utilization
 
+def bench_rados():
+	'''
+	Test all the following pool type 1) SSD 2) HDD 3) MIX
+	Test replication size 2 and 3 
+	Test read type rand and seq 
+	Test all operation with thread count 1, CPU size, Max Core Thread total 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.bench_rados
+	'''
+	bench_path = '/home/ceph/.ceph_sles_bench_report'
+	pool_names = ['ssd','hdd','mix']
+	thread_counts = [1, 4, 16]
+	bench_time = 300	
+	
+
+	create_pool( 'ssd_pool_2', 100, 2, 'ssd_replicated' )
+	create_pool( 'ssd_pool_3', 100, 3, 'ssd_replicated' )
+
+	create_pool( 'hdd_pool_2', 100, 2, 'hdd_replicated' )
+	create_pool( 'hdd_pool_3', 100, 3, 'hdd_replicated' )
+	
+	create_pool( 'mix_pool_2', 100, 2 )
+	create_pool( 'mix_pool_3', 100, 3 )
+
+	_bench_prep()
+
+	for pool in pool_names:
+		bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time*2) + ' write --no-cleanup', 
+		output_loglevel='debug' )
+		rep2_log = bench_path + '/' + pool + '_pool_2_write_default_nocleanup.log' 
+		logfile = open( rep2_log ,  "w" )
+		logfile.write( bench_result )
+		logfile.close()
+		os.chown( rep2_log, 1000, 100 )
+
+		bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', 
+		output_loglevel='debug' )
+		rep2_log = bench_path + '/' + pool + '_pool_2_write_default_nocleanup.log' 
+		logfile = open( rep2_log ,  "w" )
+		logfile.write( bench_result )
+		logfile.close()
+		os.chown( rep2_log, 1000, 100 )
+
+		for thread in thread_counts:
+			bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', 
+			output_loglevel='debug' )
+			rep2_log = bench_path + '/' + pool + '_pool_2_rand_thread_' + str(thread) + '.log' 
+			logfile = open( rep2_log ,  "w" )
+			logfile.write( bench_result )
+			logfile.close()
+			os.chown( rep2_log, 1000, 100 )
+
+			bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', 
+			output_loglevel='debug' )
+			rep3_log = bench_path + '/' + pool + '_pool_3_rand_thread_' + str(thread) + '.log' 
+			logfile = open( rep3_log ,  "w" )
+			logfile.write( bench_result )
+			logfile.close()
+			os.chown( rep3_log, 1000, 100 )
+
+			bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', 
+			output_loglevel='debug' )
+			rep2_log = bench_path + '/' + pool + '_pool_2_seq_thread_' + str(thread) + '.log' 
+			logfile = open( rep2_log ,  "w" )
+			logfile.write( bench_result )
+			logfile.close()
+			os.chown( rep2_log, 1000, 100 )
+
+			bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', 
+			output_loglevel='debug' )
+			rep3_log = bench_path + '/' + pool + '_pool_3_seq_thread_' + str(thread) + '.log' 
+			logfile = open( rep3_log ,  "w" )
+			logfile.write( bench_result )
+			logfile.close()
+			os.chown( rep3_log, 1000, 100 )
+
+		for thread in thread_counts:
+			bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' write -t ' + str(thread), 
+			output_loglevel='debug' )
+			rep2_log = bench_path + '/' + pool + '_pool_2_write_thread_' + str(thread) + '.log' 
+			logfile = open( rep2_log ,  "w" )
+			logfile.write( bench_result )
+			logfile.close()
+			os.chown( rep2_log, 1000, 100 )
+
+			bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' write -t ' + str(thread), 
+			output_loglevel='debug' )
+			rep3_log = bench_path + '/' + pool + '_pool_3_write_thread_' + str(thread) + '.log' 
+			logfile = open( rep3_log ,  "w" )
+			logfile.write( bench_result )
+			logfile.close()
+			os.chown( rep3_log, 1000, 100 )
+
+	remove_pool( 'ssd_pool_2' )
+	remove_pool( 'ssd_pool_3' )
+	remove_pool( 'hdd_pool_2' )
+	remove_pool( 'hdd_pool_2' )
+	remove_pool( 'mix_pool_3' )
+	remove_pool( 'mix_pool_3' )
+
 def clean_disk_partition( nodelist=None, partlist=None):
 	'''
 	Remove disk partition table 
@@ -366,10 +480,10 @@ def create_pool( pool_name, pg_num, replication_size, ruleset_name='replicated_r
 	salt 'node1' ceph_sles.create_pool ssd_pool_name 100<pg_num> 2<replicate> ruleset_name pooltype<default replicated> 
 	'''
 	create_pool = __salt__['cmd.run']('ceph osd pool create ' + pool_name + ' ' + str(pg_num) + ' ' + pool_type + ' ' + ruleset_name , 
-	output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	output_loglevel='debug', cwd='/etc/ceph' )
 
 	create_pool += __salt__['cmd.run']('ceph osd pool set ' + pool_name + ' size ' + str(replication_size),
-	output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	output_loglevel='debug', cwd='/etc/ceph' )
 
 	# create_pool = __salt__['cmd.run']('ceph osd pool set ' + pool_name + ' rulsset ' + ruleset_num,
 	# output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
@@ -741,7 +855,7 @@ def _read_crushmap_has_ruleset_update( ruleset_section ):
 	'''
 	section = StringIO.StringIO( ruleset_section )
 	for line in section:
-		if line.startswith( 'rule ssd_replicated' ) or line.startswith( 'rule ssd_replicated' ):
+		if line.startswith( 'rule ssd_replicated' ) or line.startswith( 'rule hdd_replicated' ):
 			return True
 	return False
 
