@@ -287,9 +287,14 @@ def push_conf( *node_names ):
 	salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
 	'''
 	node_list = ''
+	out_log = ''
 	for node in node_names:
-		node_list = node_list + node + ' '
-	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+		# node_list = node_list + node + ' '
+		out_log += node + ':\n'
+		out_log += __salt__['cmd.run']('salt-cp "' + node + '" /home/ceph/.ceph_sles_cluster_config/ceph.conf /etc/ceph/', output_loglevel='debug' ) + '\n'
+		out_log += __salt__['cmd.run']('salt-cp "' + node + '" /home/ceph/.ceph_sles_cluster_config/ceph.client.admin.keyring /etc/ceph/', output_loglevel='debug' ) + '\n'
+	# out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+
 	# need to change permission 
 	# /etc/ceph/ceph.client.admin.keyring
 	ceph_key = '/etc/ceph/ceph.client.admin.keyring'
@@ -393,13 +398,13 @@ def bench_rados():
 		logfile.close()
 		os.chown( rep2_log, 1000, 100 )
 
-		bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', 
+		bench3_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', 
 		output_loglevel='debug' )
-		rep2_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log' 
-		logfile = open( rep2_log ,  "w" )
-		logfile.write( bench_result )
+		rep3_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log' 
+		logfile = open( rep3_log ,  "w" )
+		logfile.write( bench3_result )
 		logfile.close()
-		os.chown( rep2_log, 1000, 100 )
+		os.chown( rep3_log, 1000, 100 )
 
 		for thread in thread_counts:
 			bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', 
