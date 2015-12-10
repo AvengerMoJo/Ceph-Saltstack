@@ -463,7 +463,24 @@ def bench_rados():
 	remove_pool( 'mix_pool_2' )
 	remove_pool( 'mix_pool_3' )
 
-def clean_disk_partition( nodelist=None, partlist=None):
+def clean_disk_partition( partlist=None):
+	'''
+	Remove disk partition table 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node*' ceph_sles.clean_disk_partition "/dev/sdb,/dev/sdc,/dev/sde"
+	'''
+	part_list = partlist.split(",")
+	disk_zap = ""
+
+	for part in part_list:
+		disk_zap += __salt__['cmd.run']('ceph-disk zap ' + part , output_loglevel='debug' )
+		disk_zap += __salt__['cmd.run']('partx -a ' + part , output_loglevel='debug' )
+	return disk_zap
+
+def clean_disk_partition_old( nodelist=None, partlist=None):
 	'''
 	Remove disk partition table 
 
