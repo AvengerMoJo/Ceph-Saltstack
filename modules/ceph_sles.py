@@ -252,7 +252,142 @@ def send_key( *node_names ):
 		out_log.append( __salt__['cmd.run']('sshpass -p "suse1234" ssh-copy-id ceph@'+node , output_loglevel='debug', runas='ceph' ))
 	return out_log
 
+def create_mon_node():
+	'''
+        Node creating mon with and monmap key file from master
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.create_mon_node fsid  
+	'''
+	node = socket.gethostname()
+	mon_dir = '/var/lib/ceph/mon/ceph-' + node
+	mon_key = 'ceph.mon.keyring'
+	mon_map = 'monmap' 
+	mon_key_file = '/tmp/'+ mon_key
+	mon_map_file = '/tmp/'+ mon_map
+	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+
+	output = __salt__['cmd.run']('mkdir -p ' + mon_dir, output_loglevel='debug' )
+	output += __salt__['cmd.run']('ceph-mon --mkfs -i ' + node + ' --monmap ' + mon_map_file + ' --keyring ' +\
+	mon_key_file, output_loglevel='debug' )
+	output += __salt__['cmd.run']('touch ' + mon_dir + '/done', output_loglevel='debug' )
+	output += '\nStarting ceph-mon at '+ node + ':' + str( __salt__['service.start']('ceph-mon@'+node) )
+	output += __salt__['cmd.run']('rm ' + mon_key_file,  output_loglevel='debug')
+	output += __salt__['cmd.run']('rm ' + mon_map_file,  output_loglevel='debug')
+	return output
+
+def create_keys_all():
+	'''
+        Node creating mon with fsid and key file from master
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.create_key_node
+	'''
+	node = socket.gethostname()
+	output = ''
+	output += __salt__['cmd.run']('ceph-create-keys --cluster ceph --id ' + node, output_loglevel='debug' )
+	return output
+
 def new_mon( *node_names ):
+	'''
+        Create new ceph cluster configuration step by step 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
+	'''
+	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	mon_keyring_name = 'ceph.mon.keyring'
+	admin_keyring_name = 'ceph.client.admin.keyring'
+	monmap_name = 'monmap'
+	output = ''
+	if not os.path.exists( ceph_config_path ):
+		mkdir_log  = __salt__['cmd.run']('mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
+
+	global_config = "[global]"
+	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas='ceph' )
+	uuid_config = "fsid = " + uuid
+	mon_initial_member_config = "mon_initial_members = "
+	mon_host_config = "mon_host = " 
+
+	auth_config = "auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx"
+	filestore_config = "filestore_xattr_use_omap = true"
+
+	node_ip = []  
+	members_ip = ''
+	monmap_list = ''
+	if len(node_names) > 1:
+		members = ', '.join( node_names )
+		for node in node_names:
+			ip = socket.gethostbyname(node) 
+			node_ip.append( ip ) 
+			monmap_list += '--add ' + node +  ' ' + str(ip) + ' '
+		members_ip = ', '.join( node_ip )
+	else:
+		members = str(node_names[0])
+		members_ip = socket.gethostbyname(str(node_names[0]))
+		monmap_list += '--add ' + members + ' ' +  members_ip + ' '
+	
+
+	config_out = global_config + '\n'
+	config_out += uuid_config + '\n'
+	config_out += mon_initial_member_config + members + '\n'
+	config_out += mon_host_config + members_ip + '\n'
+	config_out += auth_config + '\n'
+	config_out += filestore_config + '\n'
+
+	ceph_config_file = ceph_config_path + '/' + 'ceph.conf' 
+	logfile = open( ceph_config_file ,  "w" )
+	logfile.write( config_out )
+	logfile.close()
+	os.chown( ceph_config_file, 1000, 100 )
+
+	mon_key_filename =  ceph_config_path + '/' + mon_keyring_name 
+	admin_key_filename = ceph_config_path + '/' + admin_keyring_name
+	monmap_filename = '/tmp/' + monmap_name
+	
+	output += "Create mon key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + mon_key_filename + \
+	' --gen-key -n mon. --cap mon "allow *"', output_loglevel='debug', runas='ceph' ) + '\n'
+	output += "Create admin key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + admin_key_filename + \
+	' --gen-key -n client.admin --set-uid=0 --cap mon "allow *" --cap osd "allow *" --cap mds "allow"',\
+	 output_loglevel='debug', runas='ceph' ) + '\n'
+
+	push_conf( *node_names )
+
+	join_keyring = __salt__['cmd.run']('ceph-authtool ' + mon_key_filename + ' --import-keyring ' +\
+ 	admin_key_filename, output_loglevel='debug', runas='ceph' )
+
+	output += __salt__['cmd.run']('monmaptool --create ' + monmap_list + ' --fsid ' + uuid + \
+	' --clobber ' + monmap_filename, output_loglevel='debug', runas='ceph' ) + '\n'
+
+	if len(node_names) > 1:
+		for node in node_names:
+			output += __salt__['cmd.run']('salt-cp "' + node + '" ' + mon_key_filename +\
+			' /tmp/' + mon_keyring_name  , output_loglevel='debug' ) + '\n'
+			output += __salt__['cmd.run']('salt-cp "' + node + '" ' + monmap_filename +\
+			' /tmp/monmap' , output_loglevel='debug' ) + '\n'
+			output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
+	else:
+		output += __salt__['cmd.run']('salt-cp "' + str(node_names[0]) + '" ' + mon_key_filename +\
+		' /tmp/' + mon_keyring_name  , output_loglevel='debug' ) + '\n'
+		output += __salt__['cmd.run']('salt-cp "' + str(node_names[0]) + '" ' + monmap_filename +\
+		' ' + monmap_filename, output_loglevel='debug' ) + '\n'
+		output += __salt__['cmd.run']('salt "' + str(node_names[0]) + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
+
+	if len(node_names) > 1:
+		for node in node_names:
+			output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.create_keys_all' , output_loglevel='debug' )
+	else:
+		output += __salt__['cmd.run']('salt "' + str(node_names[0]) + '" ceph_sles.create_keys_all' , output_loglevel='debug' )
+	
+	return output
+
+def new_mon_old( *node_names ):
 	'''
         Create new ceph cluster configuration by running ceph-deploy new, mon
 	create-initial, admin 
@@ -338,7 +473,7 @@ def bench_network( master_node, *client_node ):
 		iperf_out = __salt__['state.sls']('iperf')
 	else:
 		for node in client_node:
-			time.sleep(15) # delays for 5 seconds
+			time.sleep(15) # delays for 15 seconds
 			if node == node_name:
 				iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -c ' + master_node + ' -d' , output_loglevel='debug')
 				break
