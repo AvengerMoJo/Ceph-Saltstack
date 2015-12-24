@@ -189,6 +189,23 @@ def _parted_start( dev ):
 	return int(start)
 
 def _prep_activate_osd( node, part, journal ):
+	ceph_conf_file = '/etc/ceph/ceph.conf'
+	osd_path = '/var/lib/ceph/osd'
+	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas='ceph' )
+	new_osd_id = __salt__['cmd.run']('ceph osd create ' + uuid, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	fsid = ''
+	for line in fileinput.input( ceph_conf_file ):
+		if line.startswith( 'fsid' ):
+			fsid = line.split('=')[1].strip()
+
+	osd_name_dir = osd_path + '/ceph-' + new_osd_id
+	output = __salt__['cmd.run']('mkdir -p ' + osd_name_dir, output_loglevel='debug' )
+
+	prep = __salt__['cmd.run']('ceph-disk prepare --cluster-uuid '+ fsid + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	return prep+activate
+
+def _prep_activate_osd_old( node, part, journal ):
 	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return prep+activate
@@ -289,7 +306,7 @@ def create_keys_all():
 	'''
 	node = socket.gethostname()
 	output = ''
-	output += __salt__['cmd.run']('ceph-create-keys --cluster ceph --id ' + node, output_loglevel='debug' )
+	output += __salt__['cmd.run']('ceph-create-keys --cluster ceph --id ' + node, output_loglevel='debug', env={ 'HOME':'/root'})
 	return output
 
 def new_mon( *node_names ):
@@ -307,7 +324,7 @@ def new_mon( *node_names ):
 	monmap_name = 'monmap'
 	output = ''
 	if not os.path.exists( ceph_config_path ):
-		mkdir_log  = __salt__['cmd.run']('mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
+		mkdir_log  = __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
 
 	global_config = "[global]"
 	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas='ceph' )
@@ -357,32 +374,42 @@ def new_mon( *node_names ):
 	' --gen-key -n client.admin --set-uid=0 --cap mon "allow *" --cap osd "allow *" --cap mds "allow"',\
 	 output_loglevel='debug', runas='ceph' ) + '\n'
 
-	push_conf( *node_names )
 
 	join_keyring = __salt__['cmd.run']('ceph-authtool ' + mon_key_filename + ' --import-keyring ' +\
  	admin_key_filename, output_loglevel='debug', runas='ceph' )
 
-	output += __salt__['cmd.run']('monmaptool --create ' + monmap_list + ' --fsid ' + uuid + \
+	output += "Monmaptool create :\n" + __salt__['cmd.run']('monmaptool --create ' + monmap_list + ' --fsid ' + uuid + \
 	' --clobber ' + monmap_filename, output_loglevel='debug', runas='ceph' ) + '\n'
 
 	if len(node_names) > 1:
 		for node in node_names:
+			output += "Copy monkey, monmap to node -> " + node + ":\n"
 			output += __salt__['cmd.run']('salt-cp "' + node + '" ' + mon_key_filename +\
 			' /tmp/' + mon_keyring_name  , output_loglevel='debug' ) + '\n'
 			output += __salt__['cmd.run']('salt-cp "' + node + '" ' + monmap_filename +\
 			' /tmp/monmap' , output_loglevel='debug' ) + '\n'
+			output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.purge_mon', output_loglevel='debug' ) + '\n'
 			output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
 	else:
+		output += "Copy monkey, monmap to node -> " + node + ":\n"
 		output += __salt__['cmd.run']('salt-cp "' + str(node_names[0]) + '" ' + mon_key_filename +\
 		' /tmp/' + mon_keyring_name  , output_loglevel='debug' ) + '\n'
 		output += __salt__['cmd.run']('salt-cp "' + str(node_names[0]) + '" ' + monmap_filename +\
 		' ' + monmap_filename, output_loglevel='debug' ) + '\n'
+		output += __salt__['cmd.run']('salt "' + str(node_names[0]) + '" ceph_sles.purge_mon', output_loglevel='debug' ) + '\n'
 		output += __salt__['cmd.run']('salt "' + str(node_names[0]) + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
+
+	time.sleep(30) # delays for 30 seconds
+
+	output += "Push conf to " + str(node_names) + ":\n"
+	push_conf( *node_names )
 
 	if len(node_names) > 1:
 		for node in node_names:
+			output += "Create Keys " + node + ":\n"
 			output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.create_keys_all' , output_loglevel='debug' )
 	else:
+		output += "Create Keys " + node_names[0] + ":\n"
 		output += __salt__['cmd.run']('salt "' + str(node_names[0]) + '" ceph_sles.create_keys_all' , output_loglevel='debug' )
 	
 	return output
@@ -412,6 +439,21 @@ def new_mon_old( *node_names ):
 	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 	return mkdir_log + deploy_new_log + out_log
 
+def purge_mon():
+	'''
+        Remove all configuration and data file of a mon node
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.purge_mon  
+	'''
+	node = socket.gethostname()
+	mon_dir = '/var/lib/ceph/mon/ceph-' + node
+	output = str( __salt__['service.stop']('ceph-mon@'+node) )
+	output += __salt__['cmd.run']('rm -rf ' + mon_dir + '/',  output_loglevel='debug')
+	return output
+
 def push_conf( *node_names ):
 	'''
         Send cluster configuration file from to all needed nodes
@@ -428,12 +470,11 @@ def push_conf( *node_names ):
 		out_log += node + ':\n'
 		out_log += __salt__['cmd.run']('salt-cp "' + node + '" /home/ceph/.ceph_sles_cluster_config/ceph.conf /etc/ceph/', output_loglevel='debug' ) + '\n'
 		out_log += __salt__['cmd.run']('salt-cp "' + node + '" /home/ceph/.ceph_sles_cluster_config/ceph.client.admin.keyring /etc/ceph/', output_loglevel='debug' ) + '\n'
-	# out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
 
 	# need to change permission 
 	# /etc/ceph/ceph.client.admin.keyring
-	ceph_key = '/etc/ceph/ceph.client.admin.keyring'
-	os.chown( ceph_key, 1000, 100 )
+	# ceph_key = '/etc/ceph/ceph.client.admin.keyring'
+	# os.chown( ceph_key, 1000, 100 )
 	
 	return out_log
 
