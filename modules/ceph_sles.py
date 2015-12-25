@@ -188,22 +188,35 @@ def _parted_start( dev ):
 		' unit s print free | grep free  | sort -t : -k 4n -k 2n  | tail -n 1 | cut -f 2 -d ":" | cut -f 1 -d "s" ', output_loglevel='debug' )
 	return int(start)
 
+def prep_activate_osd_local(part, journal):
+	node = socket.gethostname()
+	return _prep_activate_osd( node, part, journal )
+
 def _prep_activate_osd( node, part, journal ):
 	ceph_conf_file = '/etc/ceph/ceph.conf'
 	osd_path = '/var/lib/ceph/osd'
-	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas='ceph' )
-	new_osd_id = __salt__['cmd.run']('ceph osd create ' + uuid, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+
+	uuid = __salt__['cmd.run']('uuidgen', env={'HOME':'/root'} )
+	new_osd_id = __salt__['cmd.run']('ceph osd create ' + uuid, output_loglevel='debug', env={'HOME':'/root'} )
+
+	output = 'Node = ' + node + '\n'
+	output += 'Gen uuid = ' + uuid + '\n'
+	output += 'Next OSD ID = ' + new_osd_id + '\n'
+
+
 	fsid = ''
 	for line in fileinput.input( ceph_conf_file ):
 		if line.startswith( 'fsid' ):
 			fsid = line.split('=')[1].strip()
 
 	osd_name_dir = osd_path + '/ceph-' + new_osd_id
-	output = __salt__['cmd.run']('mkdir -p ' + osd_name_dir, output_loglevel='debug' )
 
-	prep = __salt__['cmd.run']('ceph-disk prepare --cluster-uuid '+ fsid + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
-	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
-	return prep+activate
+	output += 'FSID = ' + fsid + '\n'
+	output += __salt__['cmd.run']('mkdir -p ' + osd_name_dir, output_loglevel='debug' ) + '\n'
+
+	prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type ext4 ' + part + '1 ' + journal, output_loglevel='debug', env={'HOME':'/root'} )
+	activate = __salt__['cmd.run']('ceph-disk activate ' + part + '1 ', output_loglevel='debug', env={'HOME':'/root'} )
+	return output+prep+activate
 
 def _prep_activate_osd_old( node, part, journal ):
 	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
@@ -773,7 +786,8 @@ def prep_osd( nodelist=None, partlist=None):
 
 	for node in node_list:
 		for part in part_list:
-			result += _prep_activate_osd( node, part, journal_path+str(osd_num))
+			result += __salt__['cmd.run']('salt "' + node + '" ceph_sles.prep_activate_osd_local ' + part + ' ' + journal_path+str(osd_num), output_loglevel='debug' ) + '\n'
+			# result += _prep_activate_osd( node, part, journal_path+str(osd_num))
 			osd_num += 1
 	return result
 
