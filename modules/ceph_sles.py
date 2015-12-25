@@ -665,9 +665,14 @@ def clean_disk_partition( partlist=None):
 	disk_zap = ""
 
 	for part in part_list:
+		mount = __salt__['cmd.run']('mount | grep ' + part + ' | cut -f 1 -d \' \'' )
+		if mount:
+			output = 'Umount ' + mount + '\n'
+			output += __salt__['cmd.run']('umount ' + mount  )
+		disk_zap = 'Remove Partition ' + part + '\n'
 		disk_zap += __salt__['cmd.run']('ceph-disk zap ' + part , output_loglevel='debug' )
 		disk_zap += __salt__['cmd.run']('partx -a ' + part , output_loglevel='debug' )
-	return disk_zap
+	return output + '\n' + disk_zap
 
 def clean_disk_partition_old( nodelist=None, partlist=None):
 	'''
