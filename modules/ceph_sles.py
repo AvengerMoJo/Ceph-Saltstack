@@ -214,9 +214,11 @@ def _prep_activate_osd( node, part, journal ):
 	output += 'FSID = ' + fsid + '\n'
 	output += __salt__['cmd.run']('mkdir -p ' + osd_name_dir, output_loglevel='debug' ) + '\n'
 
+	new_partition = __salt__['cmd.run']('parted ' + part + ' mkpart xfs 2048s 100%', output_loglevel='debug' ) + '\n'
 	prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type ext4 ' + part + '1 ' + journal, output_loglevel='debug', env={'HOME':'/root'} )
+	prep += '\n'
 	activate = __salt__['cmd.run']('ceph-disk activate ' + part + '1 ', output_loglevel='debug', env={'HOME':'/root'} )
-	return output+prep+activate
+	return output+prep+new_partition+activate
 
 def _prep_activate_osd_old( node, part, journal ):
 	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
@@ -663,6 +665,7 @@ def clean_disk_partition( partlist=None):
 	'''
 	part_list = partlist.split(",")
 	disk_zap = ""
+	output = ""
 
 	for part in part_list:
 		mount = __salt__['cmd.run']('mount | grep ' + part + ' | cut -f 1 -d \' \'' )
