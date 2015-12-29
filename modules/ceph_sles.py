@@ -262,6 +262,8 @@ def new_mon( *node_names ):
 	.. code-block:: bash
 	salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
 	'''
+	mkdir_log = ''
+	deploy_new_log = ''
 	node_list = ''
 	for node in node_names :
 		node_list = node_list + node + ' '
@@ -361,7 +363,7 @@ def bench_rados():
 	bench_path = '/home/ceph/.ceph_sles_bench_report'
 	pool_names = ['ssd','hdd','mix']
 	thread_counts = [1, 4, 16]
-	bench_time = 300	
+	bench_time = 100	
 	
 
 	create_pool( 'ssd_pool_2', 100, 2, 'ssd_replicated' )
