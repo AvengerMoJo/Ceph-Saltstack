@@ -290,6 +290,11 @@ def push_conf( *node_names ):
 	for node in node_names:
 		node_list = node_list + node + ' '
 	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf admin '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	# need to change permission 
+	# /etc/ceph/ceph.client.admin.keyring
+	ceph_key = '/etc/ceph/ceph.client.admin.keyring'
+	os.chown( ceph_key, 1000, 100 )
+	
 	return out_log
 
 def bench_disk( *disk_dev ):
@@ -390,7 +395,7 @@ def bench_rados():
 
 		bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', 
 		output_loglevel='debug' )
-		rep2_log = bench_path + '/' + pool + '_pool_2_write_default_nocleanup.log' 
+		rep2_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log' 
 		logfile = open( rep2_log ,  "w" )
 		logfile.write( bench_result )
 		logfile.close()
