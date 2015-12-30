@@ -305,6 +305,8 @@ def bench_disk( *disk_dev ):
 	for dev in disk_dev:
 		if __salt__['file.is_blkdev'](dev):
 			dev_list = dev_list + dev + ' '
+	if dev_list == '':
+		return False
 	result = __salt__['cmd.run']('/sbin/hdparm -t ' + dev_list , output_loglevel='debug')
 	return result
 
@@ -540,7 +542,7 @@ def prep_osd_journal( partition_dev, part_size ):
 	else:
 		_disk_format_xfs( partition_dev + str(new_part_num) )
 		new_part_label = _disk_part_label( partition_dev ) + str(new_part_num)
-		_fstab_update_part( new_part_label, journal_path ) 
+		_fstab_add_part( new_part_label, journal_path ) 
 
 	new_part_mount = __salt__['cmd.run']('mount '+ journal_path, output_loglevel='debug' )
 
