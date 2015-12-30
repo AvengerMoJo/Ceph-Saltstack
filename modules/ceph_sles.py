@@ -454,8 +454,8 @@ def bench_rados():
 	remove_pool( 'ssd_pool_2' )
 	remove_pool( 'ssd_pool_3' )
 	remove_pool( 'hdd_pool_2' )
-	remove_pool( 'hdd_pool_2' )
-	remove_pool( 'mix_pool_3' )
+	remove_pool( 'hdd_pool_3' )
+	remove_pool( 'mix_pool_2' )
 	remove_pool( 'mix_pool_3' )
 
 def clean_disk_partition( nodelist=None, partlist=None):
