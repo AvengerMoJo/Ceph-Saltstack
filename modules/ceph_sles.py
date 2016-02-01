@@ -215,7 +215,7 @@ def _prep_activate_osd( node, part, journal ):
 	output += __salt__['cmd.run']('mkdir -p ' + osd_name_dir, output_loglevel='debug' ) + '\n'
 
 	new_partition = __salt__['cmd.run']('parted ' + part + ' mkpart xfs 2048s 100%', output_loglevel='debug' ) + '\n'
-	prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type ext4 ' + part + '1 ' + journal, output_loglevel='debug', env={'HOME':'/root'} )
+	prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type xfs ' + part + '1 ' + journal, output_loglevel='debug', env={'HOME':'/root'} )
 	prep += '\n'
 	activate = __salt__['cmd.run']('ceph-disk activate ' + part + '1 ', output_loglevel='debug', env={'HOME':'/root'} )
 	return output+prep+new_partition+activate
@@ -464,9 +464,13 @@ def purge_mon():
 	salt 'node1' ceph_sles.purge_mon  
 	'''
 	node = socket.gethostname()
+	ceph_conf_dir = '/etc/ceph/*'
 	mon_dir = '/var/lib/ceph/mon/ceph-' + node
+	keyring_files = '/var/lib/ceph/bootstrap-mds/ceph.keyring /var/lib/ceph/bootstrap-osd/ceph.keyring /var/lib/ceph/bootstrap-rgw/ceph.keyring'
 	output = str( __salt__['service.stop']('ceph-mon@'+node) )
 	output += __salt__['cmd.run']('rm -rf ' + mon_dir + '/',  output_loglevel='debug')
+	output += __salt__['cmd.run']('rm -rf ' + keyring_files ,  output_loglevel='debug')
+	output += __salt__['cmd.run']('rm -rf ' + ceph_conf_dir ,  output_loglevel='debug')
 	return output
 
 def push_conf( *node_names ):
