@@ -197,11 +197,11 @@ def _prep_activate_osd( node, part, journal ):
 	osd_path = '/var/lib/ceph/osd'
 
 	uuid = __salt__['cmd.run']('uuidgen', env={'HOME':'/root'} )
-	new_osd_id = __salt__['cmd.run']('ceph osd create ' + uuid, output_loglevel='debug', env={'HOME':'/root'} )
+	# new_osd_id = __salt__['cmd.run']('ceph osd create ' + uuid, output_loglevel='debug', env={'HOME':'/root'} )
 
 	output = 'Node = ' + node + '\n'
 	output += 'Gen uuid = ' + uuid + '\n'
-	output += 'Next OSD ID = ' + new_osd_id + '\n'
+	output += 'Journal file = ' + journal + '\n'
 
 
 	fsid = ''
@@ -209,16 +209,16 @@ def _prep_activate_osd( node, part, journal ):
 		if line.startswith( 'fsid' ):
 			fsid = line.split('=')[1].strip()
 
-	osd_name_dir = osd_path + '/ceph-' + new_osd_id
+	# osd_name_dir = osd_path + '/ceph-' + new_osd_id
+	 #output += __salt__['cmd.run']('mkdir -p ' + osd_name_dir, output_loglevel='debug' ) + '\n'
 
 	output += 'FSID = ' + fsid + '\n'
-	output += __salt__['cmd.run']('mkdir -p ' + osd_name_dir, output_loglevel='debug' ) + '\n'
 
-	new_partition = __salt__['cmd.run']('parted ' + part + ' mkpart xfs 2048s 100%', output_loglevel='debug' ) + '\n'
-	prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type xfs ' + part + '1 ' + journal, output_loglevel='debug', env={'HOME':'/root'} )
+	# new_partition = __salt__['cmd.run']('parted ' + part + ' mkpart xfs 2048s 100%', output_loglevel='debug' ) + '\n'
+	prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type xfs --data-dev ' + part + ' ' + journal, output_loglevel='debug', env={'HOME':'/root'} )
 	prep += '\n'
 	activate = __salt__['cmd.run']('ceph-disk activate ' + part + '1 ', output_loglevel='debug', env={'HOME':'/root'} )
-	return output+prep+new_partition+activate
+	return output+prep+activate
 
 def _prep_activate_osd_old( node, part, journal ):
 	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
@@ -404,6 +404,7 @@ def new_mon( *node_names ):
 			output += __salt__['cmd.run']('salt-cp "' + node + '" ' + monmap_filename +\
 			' /tmp/monmap' , output_loglevel='debug' ) + '\n'
 			output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.purge_mon', output_loglevel='debug' ) + '\n'
+			output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
 			output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
 	else:
 		output += "Copy monkey, monmap to node -> " + node + ":\n"
@@ -790,15 +791,22 @@ def prep_osd( nodelist=None, partlist=None):
 	salt 'node1' ceph_sles.prep_osd "node1,node2,node3" "/dev/sda5,/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde"
 
 	'''
-	journal_path = '/var/lib/ceph/osd/journal/osd-'
+	journal_path = '/var/lib/ceph/osd/journal/osd'
 	result = ""
-	osd_num = 0
 	node_list = nodelist.split(",")
 	part_list = partlist.split(",")
 
+	new_osd_id = __salt__['cmd.run']('ceph osd ls | tail -n 1', output_loglevel='debug', env={'HOME':'/root'} )
+
+	if not new_osd_id:
+		osd_num = 0
+	else:
+		osd_num = int(new_osd_id)
+
+
 	for node in node_list:
 		for part in part_list:
-			result += __salt__['cmd.run']('salt "' + node + '" ceph_sles.prep_activate_osd_local ' + part + ' ' + journal_path+str(osd_num), output_loglevel='debug' ) + '\n'
+			result += __salt__['cmd.run']('salt "' + node + '" ceph_sles.prep_activate_osd_local ' + part + ' ' + journal_path + '-' + str(osd_num), output_loglevel='debug' ) + '\n'
 			# result += _prep_activate_osd( node, part, journal_path+str(osd_num))
 			osd_num += 1
 	return result
@@ -826,17 +834,20 @@ def list_osd():
 	return "Possible OSD is not clean in /var/lib/ceph/osd/ :\n" + file_list + "\n\nCurrently mounted osd :\t Mount point:\n" + mounted_osd
 
 
-def clean_osd( *osd_num ):
+def purge_osd( *osd_num ):
 	'''
 	Umount the osd mount point and clean up the host osd leave over files
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node*' ceph_sles.clean_osd 0 1 2 3 
+	salt 'node*' ceph_sles.purge_osd 0 1 2 3 
 	'''
-	clean_log = ""
+	prepare_active_lock = '/var/lib/ceph/tmp/ceph-disk.prepare.lock /var/lib/ceph/tmp/ceph-disk.activate.lock'
+	clean_log = ''
+	stop = ''
 	for remove_osd in osd_num:
+		stop += str( __salt__['service.stop']('ceph-osd@' + str(remove_osd)))
 		for ceph_path in _list_osd_files().split("\n"):
 			mounted = __salt__['cmd.run']('mount | grep "' + ceph_path + '"| grep ceph-' + str(remove_osd) + '| cut -f 3 -d " "', output_loglevel='debug')
 			if mounted:
@@ -847,6 +858,7 @@ def clean_osd( *osd_num ):
 				clean_log += 'remove /var/lib/ceph/osd/ceph-' + str(remove_osd) + '\n'
 				clean_log += __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/ceph-' + str(remove_osd), output_loglevel='debug')
 		clean_log += 'remove journal ' + _remove_journal( remove_osd )
+	clean_log +=  __salt__['cmd.run']('rm -rf ' + prepare_active_lock, output_loglevel='debug')
 	return clean_log
 
 def remove_osd( *osd_num ):
