@@ -305,6 +305,7 @@ def create_mon_node():
 	output += __salt__['cmd.run']('ceph-mon --mkfs -i ' + node + ' --monmap ' + mon_map_file + ' --keyring ' +\
 	mon_key_file, output_loglevel='debug' )
 	output += __salt__['cmd.run']('touch ' + mon_dir + '/done', output_loglevel='debug' )
+	output += '\nEnabling ceph-mon at '+ node + ':' + str( __salt__['service.enable']('ceph-mon@'+node) )
 	output += '\nStarting ceph-mon at '+ node + ':' + str( __salt__['service.start']('ceph-mon@'+node) )
 	output += __salt__['cmd.run']('rm ' + mon_key_file,  output_loglevel='debug')
 	output += __salt__['cmd.run']('rm ' + mon_map_file,  output_loglevel='debug')
