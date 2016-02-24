@@ -1230,3 +1230,26 @@ def crushmap_update_disktype_ssd_hdd( *node_names ):
 	new_crushmap_file.close()
 
 	return output + _update_crushmap()
+
+
+def ntp_update( master_node ):
+	'''
+	Get all the node sync times with salt-master
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt '*' ceph_sles.bench_network admin_node
+	'''
+
+	ntp_out = False
+	node_name = socket.gethostname()
+
+	if node_name == master_node:
+		ntp_out = 'Starting ntpd ' + str( __salt__['service.start']('ntpd'))
+	else:
+		ntp_out = __salt__['cmd.run']('ntpdate -u salt-master' , output_loglevel='debug') +'\n'
+		ntp_out += __salt__['cmd.run']('ntpdate -u salt-master' , output_loglevel='debug') +'\n'
+		ntp_out += __salt__['cmd.run']('ntpdate -u salt-master' , output_loglevel='debug') +'\n'
+	return ntp_out
+
