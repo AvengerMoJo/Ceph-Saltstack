@@ -485,13 +485,19 @@ def push_conf( *node_names ):
 	.. code-block:: bash
 	salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
 	'''
+	c_conf_dir ='/home/ceph/.ceph_sles_cluster_config/' 
+	client_key ='ceph.client.admin.keyring'
+	rgw_key ='ceph.client.radosgw.gateway.keyring'
 	node_list = ''
 	out_log = ''
 	for node in node_names:
 		# node_list = node_list + node + ' '
 		out_log += node + ':\n'
-		out_log += __salt__['cmd.run']('salt-cp "' + node + '" /home/ceph/.ceph_sles_cluster_config/ceph.conf /etc/ceph/', output_loglevel='debug' ) + '\n'
-		out_log += __salt__['cmd.run']('salt-cp "' + node + '" /home/ceph/.ceph_sles_cluster_config/ceph.client.admin.keyring /etc/ceph/', output_loglevel='debug' ) + '\n'
+		out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + c_conf_dir + '/ceph.conf /etc/ceph/', output_loglevel='debug' ) + '\n'
+		out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + c_conf_dir + '/' + client_key + ' /etc/ceph/', output_loglevel='debug' ) + '\n'
+
+		if salt_utils.istextfile( c_conf_dir + '/' + rgw_key ):
+			out_log += __salt__['cmd.run']('salt-cp "' + node + '" '+ c_conf_dir + '/' + rgw_key + ' /etc/ceph/', output_loglevel='debug' ) + '\n'
 
 	# need to change permission 
 	# /etc/ceph/ceph.client.admin.keyring
