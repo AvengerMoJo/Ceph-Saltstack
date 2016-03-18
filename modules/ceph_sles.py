@@ -487,7 +487,7 @@ def push_conf( *node_names ):
 	'''
 	c_conf_dir ='/home/ceph/.ceph_sles_cluster_config/' 
 	client_key ='ceph.client.admin.keyring'
-	rgw_key ='ceph.client.radosgw.gateway.keyring'
+	rgw_key ='ceph.client.radosgw.keyring'
 	node_list = ''
 	out_log = ''
 	for node in node_names:
@@ -1260,3 +1260,120 @@ def ntp_update( master_node ):
 		ntp_out += __salt__['cmd.run']('ntpdate -u salt-master' , output_loglevel='debug') +'\n'
 	return ntp_out
 
+def _radosgw_create_pool():
+	'''
+	Create all the needed pool for radosgw. (Should this be external?)
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.radosgw_create_pool 
+	'''
+	output = create_pool( '.intent-log', 32, 2, 'hdd_replicated' )
+	output += create_pool( '.log', 128, 2, 'hdd_replicated' )
+	output += create_pool( '.rgw', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.rgw.control', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.rgw.gc', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.rgw.buckets', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.rgw.buckets.index', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.rgw.buckets.extra', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.usage', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.users.email', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.users', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.users.swift', 32, 2, 'ssd_replicated' )
+	output += create_pool( '.users.uid', 32, 2, 'ssd_replicated' )
+	return output
+
+def _radosgw_keygen( gateway_node ):
+	'''
+	Create keyring for radosgw with full access. (Should this be external?)
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.radosgw_key
+	'''
+	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	radosgw_keyring  = 'ceph.client.radosgw.keyring'
+
+	keygen = __salt__['cmd.run']('ceph-authtool -C -n client.radosgw.'+ gateway_node + ' --gen-key ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas='ceph') +'\n'
+	keygen += __salt__['cmd.run']('ceph-authtool -n client.radosgw.' + gateway_node + ' --cap osd "allow rwx" --cap mon "allow rwx"  ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas='ceph') +'\n'
+	keygen += __salt__['cmd.run']('ceph auth add client.radosgw.' + gateway_node + ' --in-file ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas='ceph') +'\n'
+	return keygen
+
+def _radosgw_config_update( gateway_node ):
+	'''
+	Create keyring for radosgw with full access. (Should this be external?)
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.radosgw_config_update
+	'''
+	radosgw_var_run_dir = '/var/run/ceph-radosgw'
+	radosgw_var_log_dir = '/var/log/ceph-radosgw'
+	radosgw_sock = 'ceph.client.radosgw.fastcgi.sock'
+	radosgw_admin_sock = 'ceph.client.radosgw.asok'
+	radosgw_log = 'ceph.client.radosgw.log'
+	ceph_conf_dir = '/etc/ceph'
+	radosgw_keyring  = 'ceph.client.radosgw.keyring'
+
+	conf_out = '[client.radosgw.' + gateway_node + ']\n'
+	conf_out += 'host = ' + gateway_node + '\n'
+	conf_out += 'keyring = ' + ceph_conf_dir + '/' + radosgw_keyring + '\n'
+	conf_out += 'rgw_socket_path = ' + radosgw_var_run_dir + '/' + radosgw_sock + '\n'
+	conf_out += 'admin_socket = ' + radosgw_var_run_dir + '/' + radosgw_admin_sock + '\n' 
+	conf_out += 'log_file = ' + radosgw_var_log_dir + '/' + radosgw_log + '\n'
+	conf_out += 'rgw_frontends = civetweb port=80\n' 
+
+
+	return conf_out
+
+def _rewrite_conf_gateway( gateway_node ):
+	'''
+	Read the ceph.conf and take out the radosgw configuration if exist
+	'''
+	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	ceph_conf = 'ceph.conf'
+	old_conf = ""
+	take_out = False
+
+	# take out the old client radosgw conf if any
+	for line in fileinput.input( ceph_config_path + '/' + ceph_conf ):
+		if take_out:
+			if line.startswith( '[' ):
+				take_out = False
+		if line.startswith( '[client.radosgw' ):
+			take_out = True
+		if not take_out:
+			old_conf += line
+
+
+	old_conf += '\n'
+	new_conf = _radosgw_config_update( gateway_node )
+
+	new_conf_file = open( ceph_config_path + '/' + ceph_conf , "w" ) 
+	new_conf_file.write( old_conf )
+	new_conf_file.write( new_conf )
+	new_conf_file.close()
+	return ceph_config_path + '/' + ceph_conf  + ' updated\n'
+
+
+def create_rados_gateway( gateway_node ):
+	'''
+	Create rados gateway and enable gateway into the cluster
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.create_rados_gateway gateway_node
+	'''
+
+	out = _radosgw_create_pool()
+	out += _radosgw_keygen( gateway_node )
+	out += _rewrite_conf_gateway( gateway_node )
+	out += push_conf( gateway_node )
+	out += '\nEnabling radosgw service '+ gateway_node + ':\n' 
+	out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+	return out
