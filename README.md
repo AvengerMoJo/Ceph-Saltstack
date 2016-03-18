@@ -89,9 +89,28 @@ The following is starting to create the cluster
 	Update crushmap to create ssd,hdd,mix disktype benchmark, create ruleset for ssd,hdd,mix 2 and 3 replicate
 		$> sudo salt 'salt-master' ceph_sles.crushmap_update_disktype node1 node2 node3
 
+The following is creating the rados gateway
+
+	Create radosgw in gateway named gateway_master
+		$> sudo salt "salt-master" ceph_sles.create_rados_gateway gateway_master
+
+	Then push the new ceph.conf from the salt-master the rest of the cluster nodes 
+		$> sudo salt "salt-master" ceph_sles.push_conf node1 node2 node3
+
+	Restarting all the ceph-mon with all the nodes 
+		$> sudo salt "node*" service.restart ceph-mon@*
+
+	Create S3 access user 'avengermojo'
+		$> sudo radosgw-admin user create --uid="avengermojo" --display-name="AvengerMoJo" --email="avengermojo@gmail.com"
+
+	Create Swift access user 'avengermojo'
+		$> sudo radosgw-admin subuser create --uid="avengermojo" --subuser="avengermojo:swift" --access="full"
+		$> sudo radosgw-admin key create --subuser="avengermojo:swift" --key-type="swift" --gen-secret
+
 The following is the actual benchmark test with rados 
 	Create pool for ssd,hdd,mix with 2 and 3 replication and test read and write
 		$> sudo salt 'salt-master' ceph_sles.bench_rados 
 
-	
+
+
 
