@@ -576,34 +576,36 @@ def bench_rados():
 	.. code-block:: bash
 	salt 'salt-master' ceph_sles.bench_rados
 	'''
+	rbd_fio_name ='fio_test'
 	bench_path = '/home/ceph/.ceph_sles_bench_report'
-	pool_names = ['ssd','hdd','mix']
+	pool_names = ['ssd','hdd']
 	thread_counts = [1, 4, 16]
 	bench_time = 100	
 	
 
-	create_pool( 'ssd_pool_2', 100, 2, 'ssd_replicated' )
-	create_pool( 'ssd_pool_3', 100, 3, 'ssd_replicated' )
+	create_pool( 'ssd_pool_2', 64, 2, 'ssd_replicated' )
+	create_rbd = __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool ssd_pool_2')  + '\n'
+	create_pool( 'ssd_pool_3', 64, 3, 'ssd_replicated' )
+	create_rbd += __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool ssd_pool_3')  + '\n'
 
-	create_pool( 'hdd_pool_2', 100, 2, 'hdd_replicated' )
-	create_pool( 'hdd_pool_3', 100, 3, 'hdd_replicated' )
+	create_pool( 'hdd_pool_2', 64, 2, 'hdd_replicated' )
+	create_rbd += __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool hdd_pool_2')  + '\n'
+	create_pool( 'hdd_pool_3', 64, 3, 'hdd_replicated' )
+	create_rbd += __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool hdd_pool_3')  + '\n'
 	
-	create_pool( 'mix_pool_2', 100, 2 )
-	create_pool( 'mix_pool_3', 100, 3 )
 
 	_bench_prep()
 
 	for pool in pool_names:
-		bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time*2) + ' write --no-cleanup', 
-		output_loglevel='debug' )
-		rep2_log = bench_path + '/' + pool + '_pool_2_write_default_nocleanup.log' 
+		bench_result = __salt__['cmd.run']('fio --pool=' + pool + '_pool_2 --ioengine=rbd --rbdname=fio_test --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting', output_loglevel='debug' )
+		rep2_log = bench_path + '/' + pool + '_fio_4K_randwrite.log' 
 		logfile = open( rep2_log ,  "w" )
 		logfile.write( bench_result )
 		logfile.close()
 		os.chown( rep2_log, 1000, 100 )
 
-		bench3_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', 
-		output_loglevel='debug' )
+		bench_result = __salt__['cmd.run']('fio --pool=' + pool + '_pool_3 --ioengine=rbd --rbdname=fio_test --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting', output_loglevel='debug' ) 
+
 		rep3_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log' 
 		logfile = open( rep3_log ,  "w" )
 		logfile.write( bench3_result )
@@ -666,6 +668,57 @@ def bench_rados():
 	remove_pool( 'hdd_pool_3' )
 	remove_pool( 'mix_pool_2' )
 	remove_pool( 'mix_pool_3' )
+
+def bench_fio():
+	'''
+	Test all the following pool type with rbd 1) SSD 2) HDD 3) MIX
+	Test replication size 2 and 3 
+	Test read type rand and seq 
+	Test all operation with thread count 1, CPU size, Max Core Thread total 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.bench_fio
+	'''
+	bench_path = '/home/ceph/.ceph_sles_bench_report'
+	pool_names = ['ssd','hdd','mix']
+	thread_counts = [1, 4, 16]
+	bench_time = 100	
+	
+
+	create_pool( 'ssd_pool_2', 100, 2, 'ssd_replicated' )
+	create_pool( 'ssd_pool_3', 100, 3, 'ssd_replicated' )
+
+	create_pool( 'hdd_pool_2', 100, 2, 'hdd_replicated' )
+	create_pool( 'hdd_pool_3', 100, 3, 'hdd_replicated' )
+	
+	create_pool( 'mix_pool_2', 100, 2 )
+	create_pool( 'mix_pool_3', 100, 3 )
+
+	_bench_prep()
+
+	for pool in pool_names:
+		bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time*2) + ' write --no-cleanup', 
+		output_loglevel='debug' )
+		rep2_log = bench_path + '/' + pool + '_pool_2_write_default_nocleanup.log' 
+		logfile = open( rep2_log ,  "w" )
+		logfile.write( bench_result )
+		logfile.close()
+		os.chown( rep2_log, 1000, 100 )
+
+		bench3_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', 
+		output_loglevel='debug' )
+		rep3_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log' 
+		logfile = open( rep3_log ,  "w" )
+		logfile.write( bench3_result )
+		logfile.close()
+		os.chown( rep3_log, 1000, 100 )
+
+		for thread in thread_counts:
+			bench_result = __salt__['cmd.run']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', 
+			output_loglevel='debug' )
+			rep2_log = bench_path + '/' + pool + '_pool_2_rand_thread_' + str(thread) + '.log' 
 
 def clean_disk_partition( partlist=None):
 	'''
@@ -1376,4 +1429,51 @@ def create_rados_gateway( gateway_node ):
 	out += '\nEnabling radosgw service '+ gateway_node + ':\n' 
 	out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
 	out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+	return out
+
+def create_cache_tier( pool_name ):
+	'''
+	Create two pool ssd in front of the hdd to create cache tier 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.create_cache_tier Pool_Name 
+	'''
+	out = create_pool( pool_name + "_write_cache",  64,  2,  "ssd_replicated" )  + '\n'
+	out = create_pool( pool_name + "_read_cache",  64,  2,  "ssd_replicated" )  + '\n'
+	out += create_pool( pool_name ,  64,  2,  "hdd_replicated" )  + '\n'
+	out += __salt__['cmd.run']('ceph osd tier add ' + pool_name + ' ' + pool_name + '_write_cache ' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd tier cache-mode ' + pool_name + '_write_cache writeback' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd tier cache-mode ' + pool_name + '_read_cache readforward' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd tier set-overlay ' + pool_name + ' ' + pool_name + '_write_cache ' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd tier set-overlay ' + pool_name + ' ' + pool_name + '_read_cache ' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd pool set ' + pool_name + '_write_cache hit_set_type bloom' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd pool set ' + pool_name + '_write_cache hit_set_count 2' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd pool set ' + pool_name + '_write_cache hit_set_period 300' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd pool set ' + pool_name + '_write_cache target_max_bytes 10485760000' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd pool set ' + pool_name + '_write_cache target_max_objects 10000' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd pool set ' + pool_name + '_write_cache cache_target_dirty_ratio 0.01' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd pool set ' + pool_name + '_write_cache cache_target_full_ratio 0.1' , output_loglevel='debug' ) + '\n'
+
+	return out
+
+def remove_cache_tier( pool_name ):
+	'''
+	remove two read write pool in front of the hdd 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.remove_cache_tier Pool_Name 
+	'''
+	out = __salt__['cmd.run']('ceph osd tier cache-mode ' + pool_name + '_read_cache none' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd tier remove ' + pool_name + ' ' + pool_name + '_read_cache ' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd tier cache-mode ' + pool_name + '_write_cache forward' , output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd tier remove-overlay ' + pool_name, output_loglevel='debug' ) + '\n'
+	out += __salt__['cmd.run']('ceph osd tier remove ' + pool_name + ' ' + pool_name + '_write_cache ' , output_loglevel='debug' ) + '\n'
+	out += remove_pool( pool_name + "_write_cache")  + '\n'
+	out += remove_pool( pool_name + "_read_cache")  + '\n'
+	out += remove_pool( pool_name )  + '\n'
+
 	return out
