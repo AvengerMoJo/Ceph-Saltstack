@@ -1037,7 +1037,7 @@ def prep_osd_ssd_journal( nodelist=None, partlist=None):
 	salt 'node1' ceph_sles.prep_osd "node1,node2,node3" "/dev/sda5,/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde"
 	'''
 	journal_path = '/var/lib/ceph/osd/journal/osd'
-	return prep_osd( nodelist=None, partlist=None, journal_path=None)
+	return prep_osd( nodelist, partlist, journal_path)
 
 
 def prep_osd( nodelist=None, partlist=None, journal_path=None):
