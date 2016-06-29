@@ -475,9 +475,9 @@ def purge_mon():
 	mon_dir = '/var/lib/ceph/mon/ceph-' + node
 	keyring_files = '/var/lib/ceph/bootstrap-mds/ceph.keyring /var/lib/ceph/bootstrap-osd/ceph.keyring /var/lib/ceph/bootstrap-rgw/ceph.keyring'
 	output = str( __salt__['service.stop']('ceph-mon@'+node) )
-	output += __salt__['cmd.run']('rm -rf ' + mon_dir + '/',  output_loglevel='debug')
-	output += __salt__['cmd.run']('rm -rf ' + keyring_files ,  output_loglevel='debug')
-	output += __salt__['cmd.run']('rm -rf ' + ceph_conf_dir ,  output_loglevel='debug')
+	output += __salt__['cmd.shell']('rm -rf ' + mon_dir + '/',  output_loglevel='debug')
+	output += __salt__['cmd.shell']('rm -rf ' + keyring_files ,  output_loglevel='debug')
+	output += __salt__['cmd.shell']('rm -rf ' + ceph_conf_dir ,  output_loglevel='debug')
 	return output
 
 def push_conf( *node_names ):
@@ -678,24 +678,25 @@ def bench_fio():
 	.. code-block:: bash
 	salt 'salt-master' ceph_sles.bench_fio
 	'''
+	rbd_fio_name ='fio_test'
 	bench_path = '/home/ceph/.ceph_sles_bench_report'
 	pool_names = ['ssd','hdd','mix']
 	bench_time = 100	
 	
+	create_pool( 'ssd_pool_2', 64, 2, 'ssd_replicated' )
+	create_rbd = __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool ssd_pool_2')  + '\n'
+	create_pool( 'ssd_pool_3', 64, 3, 'ssd_replicated' )
+	create_rbd += __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool ssd_pool_3')  + '\n'
 
-	create_pool( 'ssd_pool_2', 100, 2, 'ssd_replicated' )
-	create_pool( 'ssd_pool_3', 100, 3, 'ssd_replicated' )
-
-	create_pool( 'hdd_pool_2', 100, 2, 'hdd_replicated' )
-	create_pool( 'hdd_pool_3', 100, 3, 'hdd_replicated' )
-	
-	create_pool( 'mix_pool_2', 100, 2 )
-	create_pool( 'mix_pool_3', 100, 3 )
+	create_pool( 'hdd_pool_2', 64, 2, 'hdd_replicated' )
+	create_rbd += __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool hdd_pool_2')  + '\n'
+	create_pool( 'hdd_pool_3', 64, 3, 'hdd_replicated' )
+	create_rbd += __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool hdd_pool_3')  + '\n'
 
 	_bench_prep()
 
 	for pool in pool_names:
-		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=fio_test --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting --pool='+ pool + '_pool_2', output_loglevel='debug' )
+		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting --pool='+ pool + '_pool_2', output_loglevel='debug' )
 
 		fio2_log = bench_path + '/' + pool + '_fio_4K_randwrite.log'
 		logfile = open( fio2_log,  "w" )
@@ -703,9 +704,25 @@ def bench_fio():
 		logfile.close()
 		os.chown( fio2_log, 1000, 100 )
 
-		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=fio_test --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
+		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting --pool='+ pool + '_pool_2', output_loglevel='debug' )
+
+		fio2_log = bench_path + '/' + pool + '_fio_64K_randwrite.log'
+		logfile = open( fio2_log,  "w" )
+		logfile.write( fio_result )
+		logfile.close()
+		os.chown( fio2_log, 1000, 100 )
+
+		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
 
 		fio3_log = bench_path + '/' + pool + '_fio_4K_randwrite.log' 
+		logfile = open( fio3_log ,  "w" )
+		logfile.write( fio_result )
+		logfile.close()
+		os.chown( fio3_log, 1000, 100 )
+
+		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
+
+		fio3_log = bench_path + '/' + pool + '_fio_64K_randwrite.log' 
 		logfile = open( fio3_log ,  "w" )
 		logfile.write( fio_result )
 		logfile.close()
@@ -715,8 +732,6 @@ def bench_fio():
 	remove_pool( 'ssd_pool_3' )
 	remove_pool( 'hdd_pool_2' )
 	remove_pool( 'hdd_pool_3' )
-	remove_pool( 'mix_pool_2' )
-	remove_pool( 'mix_pool_3' )
 
 def clean_disk_partition( partlist=None):
 	'''
@@ -881,9 +896,9 @@ def prep_osd( nodelist=None, partlist=None, journal_path=None):
 	for part in part_list:
 		for node in node_list:
 			if journal_path: 
-				result += __salt__['cmd.run']('salt "' + node + '" ceph_sles.prep_activate_osd_local ' + part + ' ' + journal_path + '-' + str(osd_num), output_loglevel='debug' ) + '\n'
+				result += __salt__['cmd.run']('salt --async "' + node + '" ceph_sles.prep_activate_osd_local ' + part + ' ' + journal_path + '-' + str(osd_num), output_loglevel='debug' ) + '\n'
 			else:
-				result += __salt__['cmd.run']('salt "' + node + '" ceph_sles.prep_activate_osd_local ' + part, output_loglevel='debug' ) + '\n'
+				result += __salt__['cmd.run']('salt --async "' + node + '" ceph_sles.prep_activate_osd_local ' + part, output_loglevel='debug' ) + '\n'
 			# result += _prep_activate_osd( node, part, journal_path+str(osd_num))
 			osd_num += 1
 	return result
@@ -1251,6 +1266,9 @@ def _read_ruleset_next_id( all_ruleset ):
 			next_id = int( rule_id ) 
 	return next_id + 1
 
+
+	ruleset_list += '\n' + end_line + '\n'
+
 def crushmap_update_disktype_ssd_hdd( *node_names ):
 	'''
 	Run the command from master-admin node
@@ -1297,6 +1315,7 @@ def crushmap_update_disktype_ssd_hdd( *node_names ):
 		max_size = 3 
 		# add the ssd and hdd replicated ruleset 
 		ruleset_list += _crushmap_add_ssd_hdd_ruleset( 'replicated', next_ruleset_id, min_size, max_size )
+		ruleset_list += _crushmap_add_ssd_hdd_ruleset( 'erasure', next_ruleset_id+2, min_size, max_size )
 
 	ruleset_list += '\n' + end_line + '\n'
 
