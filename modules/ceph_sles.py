@@ -75,14 +75,14 @@ def _disk_sector_size( dev ):
 	'''
 	# lsblk /dev/sda -o PHY-SEC,LOG-SEC
 	# /sys/block/sda/queue/hw_sector_size
-	size = __salt__['cmd.run']('lsblk ' + dev + ' -o LOG-SEC | head -n 2 | tail -n 1', output_loglevel='debug' )
+	size = __salt__['cmd.shell']('lsblk ' + dev + ' -o LOG-SEC | head -n 2 | tail -n 1', output_loglevel='debug' )
 	return int(size)
 
 def _disk_last_part( dev ):
 	'''
 	get disk highest partition number 
 	'''
-	part = __salt__['cmd.run']('parted ' + dev + ' print -m -s | tail -1 | cut -f 1 -d ":"', output_loglevel='debug' )
+	part = __salt__['cmd.shell']('parted ' + dev + ' print -m -s | tail -1 | cut -f 1 -d ":"', output_loglevel='debug' )
 	if part.isdigit():
 		return int(part)
 	else:
@@ -94,7 +94,7 @@ def _disk_remove_last_part( dev ):
 	'''
 	part = _disk_last_part( dev )
 	if part:
-		remove_part = __salt__['cmd.run']('parted ' + dev + ' rm ' + str(part), output_loglevel='debug' )
+		remove_part = __salt__['cmd.shell']('parted ' + dev + ' rm ' + str(part), output_loglevel='debug' )
 
 def _disk_new_part( dev, part_size ):
 	'''
@@ -140,15 +140,15 @@ def _fstab_remove_part( part ):
 	'''
 	remove partition mount point from fstab
 	'''
-	cp_fstab= __salt__['cmd.run']('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug' )
-	remove_part = __salt__['cmd.run']('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab', output_loglevel='debug' )
+	cp_fstab= __salt__['cmd.shell']('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug' )
+	remove_part = __salt__['cmd.shell']('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab', output_loglevel='debug' )
 
 def _fstab_add_part( part, path ):
 	'''
 	put in the new partition and mount point into fstab
 	'''
 	_fstab_remove_part( part )
-	add_part = __salt__['cmd.run']('echo "/dev/disk/by-id/' + part + ' ' + path +
+	add_part = __salt__['cmd.shell']('echo "/dev/disk/by-id/' + part + ' ' + path +
 	' xfs	rw,defaults,noexec,nodev,noatime,nodiratime,nobarrier 0 0  ">> /etc/fstab', output_loglevel='debug' )
 
 def _ip_info():
@@ -1633,8 +1633,13 @@ def create_rados_gateway( gateway_node ):
 	out += _rewrite_conf_gateway( gateway_node )
 	out += push_conf( gateway_node )
 	out += '\nEnabling radosgw service '+ gateway_node + ':\n' 
-	out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
-	out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+	if pkg.version('ceph-radosgw',False) < '10.2':
+		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph-radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph-.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+	else:
+		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+	
 	return out
 
 def create_cache_tier( pool_name ):
