@@ -331,6 +331,65 @@ def create_keys_all():
 	output += __salt__['cmd.run']('ceph-create-keys --cluster ceph --id ' + node, output_loglevel='debug', env={ 'HOME':'/root'})
 	return output
 
+def new_ceph_cfg( *node_names ):
+	'''
+        Create new ceph cluster configuration step by step 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
+	'''
+	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	mon_keyring_name = 'ceph.mon.keyring'
+	admin_keyring_name = 'ceph.client.admin.keyring'
+	monmap_name = 'monmap'
+	output = ''
+	if not os.path.exists( ceph_config_path ):
+		mkdir_log  = __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
+
+	global_config = "[global]"
+	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas='ceph' )
+	uuid_config = "fsid = " + uuid
+	mon_initial_member_config = "mon_initial_members = "
+	mon_host_config = "mon_host = " 
+
+	auth_config = "auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx"
+	filestore_config = "filestore_xattr_use_omap = true"
+
+	node_ip = []  
+	members_ip = ''
+	monmap_list = ''
+	if len(node_names) > 1:
+		members = ', '.join( node_names )
+		for node in node_names:
+			ip = socket.gethostbyname(node) 
+			node_ip.append( ip ) 
+			monmap_list += '--add ' + node +  ' ' + str(ip) + ' '
+		members_ip = ', '.join( node_ip )
+	else:
+		members = str(node_names[0])
+		members_ip = socket.gethostbyname(str(node_names[0]))
+		monmap_list += '--add ' + members + ' ' +  members_ip + ' '
+	
+
+	config_out = global_config + '\n'
+	config_out += uuid_config + '\n'
+	config_out += mon_initial_member_config + members + '\n'
+	config_out += mon_host_config + members_ip + '\n'
+	config_out += auth_config + '\n'
+	config_out += filestore_config + '\n'
+
+	ceph_config_file = ceph_config_path + '/' + 'ceph.conf' 
+	logfile = open( ceph_config_file ,  "w" )
+	logfile.write( config_out )
+	logfile.close()
+	os.chown( ceph_config_file, 1000, 100 )
+
+	push_conf( *node_names )
+	push_conf( socket.gethostname() )
+	#return output
+
 def new_mon( *node_names ):
 	'''
         Create new ceph cluster configuration step by step 
@@ -498,7 +557,9 @@ def push_conf( *node_names ):
 		# node_list = node_list + node + ' '
 		out_log += node + ':\n'
 		out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + c_conf_dir + '/ceph.conf /etc/ceph/', output_loglevel='debug' ) + '\n'
-		out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + c_conf_dir + '/' + client_key + ' /etc/ceph/', output_loglevel='debug' ) + '\n'
+
+		if salt_utils.istextfile( c_conf_dir + '/' + client_key ):
+			out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + c_conf_dir + '/' + client_key + ' /etc/ceph/', output_loglevel='debug' ) + '\n'
 
 		if salt_utils.istextfile( c_conf_dir + '/' + rgw_key ):
 			out_log += __salt__['cmd.run']('salt-cp "' + node + '" '+ c_conf_dir + '/' + rgw_key + ' /etc/ceph/', output_loglevel='debug' ) + '\n'
