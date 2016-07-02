@@ -344,7 +344,7 @@ def new_ceph_cfg( *node_names ):
 	mon_keyring_name = 'ceph.mon.keyring'
 	admin_keyring_name = 'ceph.client.admin.keyring'
 	monmap_name = 'monmap'
-	output = ''
+	output = 'Creating default config file with node names - '
 	if not os.path.exists( ceph_config_path ):
 		mkdir_log  = __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
 
@@ -372,6 +372,7 @@ def new_ceph_cfg( *node_names ):
 		members_ip = socket.gethostbyname(str(node_names[0]))
 		monmap_list += '--add ' + members + ' ' +  members_ip + ' '
 	
+	output += mon_initial_member + members + ' ' 
 
 	config_out = global_config + '\n'
 	config_out += uuid_config + '\n'
@@ -379,6 +380,7 @@ def new_ceph_cfg( *node_names ):
 	config_out += mon_host_config + members_ip + '\n'
 	config_out += auth_config + '\n'
 	config_out += filestore_config + '\n'
+
 
 	ceph_config_file = ceph_config_path + '/' + 'ceph.conf' 
 	logfile = open( ceph_config_file ,  "w" )
@@ -388,7 +390,7 @@ def new_ceph_cfg( *node_names ):
 
 	push_conf( *node_names )
 	push_conf( socket.gethostname() )
-	#return output
+	return output
 
 def new_mon( *node_names ):
 	'''
