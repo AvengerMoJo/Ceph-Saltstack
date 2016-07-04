@@ -14,12 +14,15 @@ sudo salt "node*" ceph_sles.ntp_update salt-master > $PWD/$REPORT_DIR/ntp_sync.l
 echo "Done!"
 echo "Create ceph new mon nodes:"
 sudo salt "salt-master" ceph_sles.new_mon node1 node2 node3 > $PWD/$REPORT_DIR/new_mon.log
+sudo salt "*mon-*" ceph_sles.create_keys_all >> $PWD/$REPORT_DIR/new_mon.log
 echo "Done!"
+
 echo "Push config file over to salt-master:"
 sudo salt "salt-master" ceph_sles.push_conf salt-master  > $PWD/$REPORT_DIR/push_conf.log
 echo "Done!"
 echo "Create journal ssd partition:"
 sudo salt -L "node1 node2 node3" ceph_sles.prep_osd_journal /dev/sda 40G > $PWD/$REPORT_DIR/mount_ssd_journal.log
+
 echo "Done!" 
 echo "Prepare OSD for all node:" 
 sudo salt 'node*' ceph_sles.clean_disk_partition "/dev/sdb,/dev/sdc" > $PWD/$REPORT_DIR/clean_disk_partition.log
