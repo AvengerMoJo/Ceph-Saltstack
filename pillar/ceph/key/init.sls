@@ -1,0 +1,10 @@
+admin_key:
+    'AQAdtJxXjZpAAxAAkrxivodJgbXzbco1qgunEw=='
+mon_key:
+    'AQAWqptXSjg6BRAAnCPak4KODa4+/sfgbMeaRg=='
+osd_key:
+    'AQBmKqVXKKQcEBAAPw2WvgyXuaxEi9KlRPeaPg=='
+rgw_key:
+    'AQBmKqVXMBU+ERAAhsYCEMLpo90ttQaqb3HTbA=='
+mds_key:
+    'AQBmKqVXcktfEhAAYLNZOojJOUzcLV4XyaKWfg=='
