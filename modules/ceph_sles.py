@@ -18,6 +18,7 @@ import StringIO
 
 # Import salt library for running remote commnad
 import salt.modules.cmdmod as salt_cmd
+import salt.modules.saltutil as saltutil
 import salt.utils as salt_utils 
 # import salt.modules.pkg as salt_pkg
 
@@ -331,6 +332,86 @@ def create_keys_all():
 	output += __salt__['cmd.run']('ceph-create-keys --cluster ceph --id ' + node, output_loglevel='debug', env={ 'HOME':'/root'})
 	return output
 
+def create_ceph_cfg_key():
+	admin_key_file = __salt__['ceph.keyring_create']( keyring_type='admin')
+	mon_key_file = __salt__['ceph.keyring_create']( keyring_type='mon')
+	osd_key_file = __salt__['ceph.keyring_create']( keyring_type='osd')
+	rgw_key_file = __salt__['ceph.keyring_create']( keyring_type='rgw')
+	mds_key_file = __salt__['ceph.keyring_create']( keyring_type='mds')
+	return admin_key_file + mon_key_file + osd_key_file + rgw_key_file + mds_key_file 
+
+def new_key_pillar():
+	pillar_out = 'admin_key:\n    \'' + get_key_ceph_cfg('admin') + '\'\n'
+	pillar_out += 'mon_key:\n    \'' + get_key_ceph_cfg('mon') + '\'\n'
+	pillar_out += 'osd_key:\n    \'' + get_key_ceph_cfg('osd') + '\'\n'
+	pillar_out += 'rgw_key:\n    \'' + get_key_ceph_cfg('rgw') + '\'\n'
+	pillar_out += 'mds_key:\n    \'' + get_key_ceph_cfg('mds') + '\'\n'
+	
+	pillar_path = '/srv/pillar/ceph/key/'
+	pillar_file = 'init.sls'
+	if not os.path.exists( pillar_path ):
+		mkdir_log  = __salt__['cmd.run']( 'mkdir -p ' + pillar_path, output_loglevel='debug' )
+
+	pillar_full_path_file = pillar_path + pillar_file
+	outfile = open( pillar_full_path_file,  "w" )
+	outfile.write( pillar_out )
+	outfile.close()
+	pillar_out += 'Write keys to pillar file :' + pillar_full_path_file + '\n'
+
+	top_pillar_path = '/srv/pillar/'
+	top_pillar_file = 'top.sls'
+	if not os.path.exists( top_pillar_path ):
+		mkdir_log  += __salt__['cmd.run']( 'mkdir -p ' + top_pillar_path, output_loglevel='debug' )
+	top_pillar_full_path_file = top_pillar_path + top_pillar_file
+	top_outfile = open( top_pillar_full_path_file,  'w' )
+	top_outfile.write( 'base:\n    "*":\n       - ceph.key\n    "*mon*":\n       - ceph.mon\n    "*osd*":\n       - ceph.osd\n' )
+	top_outfile.close()
+	pillar_out += 'Write top file :' + top_pillar_full_path_file + '\n'
+
+
+	return pillar_out 
+
+def new_osd_pillar( nodelist, partlist ):
+	pillar_out = ''
+        node_list = nodelist.split(",")
+        part_list = partlist.split(",")
+
+	for node in node_list:
+		pillar_out += '    ' + node + ':\n'
+		pillar_out += '         osd_dev:\n'
+		for part in part_list:
+			pillar_out += '            ' + part + '\n'
+	
+	pillar_path = '/srv/pillar/ceph/osd/'
+	pillar_file = 'init.sls'
+	if not os.path.exists( pillar_path ):
+		mkdir_log  = __salt__['cmd.run']( 'mkdir -p ' + pillar_path, output_loglevel='debug' )
+
+	pillar_full_path_file = pillar_path + pillar_file
+	outfile = open( pillar_full_path_file,  "w" )
+	outfile.write( pillar_out )
+	outfile.close()
+	pillar_out += 'Write osd_dev to pillar file :' + pillar_full_path_file + '\n'
+
+	top_pillar_path = '/srv/pillar/'
+	top_pillar_file = 'top.sls'
+	if not os.path.exists( top_pillar_path ):
+		mkdir_log  += __salt__['cmd.run']( 'mkdir -p ' + top_pillar_path, output_loglevel='debug' )
+	top_pillar_full_path_file = top_pillar_path + top_pillar_file
+	top_outfile = open( top_pillar_full_path_file,  'w' )
+	top_outfile.write( 'base:\n    "*":\n       - ceph.key\n    "*mon*":\n       - ceph.mon\n    "*osd*":\n       - ceph.osd\n' )
+	top_outfile.close()
+	pillar_out += 'Write top file :' + top_pillar_full_path_file + '\n'
+
+	pillar_out += __salt__['cmd.run']( 'salt "*" saltutil.refresh_pillar', output_loglevel='debug')
+
+	return pillar_out 
+
+def get_key_ceph_cfg( keyring_type ):
+	key_file = __salt__['ceph.keyring_create']( keyring_type=keyring_type)
+	m = re.findall(r'key\s=\s(.*)', key_file)
+	return m[0]
+
 def new_ceph_cfg( *node_names ):
 	'''
         Create new ceph cluster configuration step by step 
@@ -341,12 +422,18 @@ def new_ceph_cfg( *node_names ):
 	salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
 	'''
 	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	pillar_ceph_config_path = '/srv/pillar/ceph'
+	salt_ceph_config_path = '/srv/salt/ceph' 
 	mon_keyring_name = 'ceph.mon.keyring'
 	admin_keyring_name = 'ceph.client.admin.keyring'
 	monmap_name = 'monmap'
 	output = 'Creating default config file with node names - '
 	if not os.path.exists( ceph_config_path ):
-		mkdir_log  = __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
+		output += __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
+	if not os.path.exists( pillar_ceph_config_path ):
+		output += __salt__['cmd.run']( 'mkdir -p '+pillar_ceph_config_path, output_loglevel='debug' )
+	if not os.path.exists( salt_ceph_config_path ):
+		output += __salt__['cmd.run']( 'mkdir -p '+salt_ceph_config_path, output_loglevel='debug' )
 
 	global_config = "[global]"
 	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas='ceph' )
@@ -372,7 +459,7 @@ def new_ceph_cfg( *node_names ):
 		members_ip = socket.gethostbyname(str(node_names[0]))
 		monmap_list += '--add ' + members + ' ' +  members_ip + ' '
 	
-	output += mon_initial_member + members + ' ' 
+	output += mon_initial_member_config + members + '\n'
 
 	config_out = global_config + '\n'
 	config_out += uuid_config + '\n'
@@ -388,8 +475,29 @@ def new_ceph_cfg( *node_names ):
 	logfile.close()
 	os.chown( ceph_config_file, 1000, 100 )
 
+	salt_ceph_config_file = salt_ceph_config_path + '/' + 'ceph.conf' 
+	salt_file = open( salt_ceph_config_file ,  "w" )
+	salt_file.write( config_out )
+	salt_file.close()
+
+	pillar_info = 'fsid:\n    \'' + uuid + '\'\n'
+	pillar_info += 'mon:\n    ' + members + '\n'
+	
+	pillar_mon_config_path = '/srv/pillar/ceph/mon'
+	if not os.path.exists( pillar_mon_config_path ):
+		output += __salt__['cmd.run']( 'mkdir -p '+pillar_mon_config_path, output_loglevel='debug' )
+	ceph_info_pillar_file = pillar_mon_config_path + '/' + 'init.sls'
+	ceph_info_out = open( ceph_info_pillar_file ,  "w" )
+	ceph_info_out.write( pillar_info )
+	ceph_info_out.close()
+	output += 'Write mon and key to pillar file :' + ceph_info_pillar_file + '\n'
+
 	push_conf( *node_names )
 	push_conf( socket.gethostname() )
+
+	# it doesn't work ... 
+	#output += __salt__['saltutil'].refresh_pillar()
+	output += __salt__['cmd.run']( 'salt "*" saltutil.refresh_pillar', output_loglevel='debug')
 	return output
 
 def new_mon( *node_names ):
