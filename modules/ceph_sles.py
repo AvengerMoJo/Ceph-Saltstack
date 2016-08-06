@@ -1196,7 +1196,7 @@ def _crushmap_root_disktype_output( disk_type, next_id, osd_weight_total ):
 	return output
 
 def _osd_tree_obj():
-	tree_view_json =  __salt__['cmd.shell']('ceph osd tree --format json | grep {', output_loglevel='debug', cwd='/etc/ceph', runas='ceph' )
+	tree_view_json =  __salt__['cmd.shell']('ceph osd tree --format json 2> /dev/null | grep {', output_loglevel='debug', cwd='/etc/ceph', runas='ceph' )
 	tree_view = json.loads( tree_view_json )
 	return tree_view
 
