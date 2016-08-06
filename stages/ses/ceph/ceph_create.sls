@@ -69,13 +69,15 @@ if 'osd' in hostname:
 
     #devs = __pillar__.get( 'osd_dev' )
     devs = __pillar__.get( hostname )['osd_dev']
-    dev = devs.split(' ')
+    fsid = __pillar__.get('fsid')
+    dev = devs.split()
     for d in dev:
-        s_prepare = state( 'osd_prepare' )
-        s_prepare.module.run( name='ceph.osd_prepare', kwargs=dict( osd_dev=d ) )\
+        s_prepare = state( 'osd_prepare_' + str(d) )
+        s_prepare.cmd.run( 'echo ' + d + ' >> /tmp/out' )
+        s_prepare.module.run( name='ceph.osd_prepare', kwargs=dict( osd_dev=d, cluster_uuid=fsid ) )\
         .require( s_osd_auth.module )
 
         s_activate = state( 'osd_activate' )
-        s_activate.module.run( name='ceph.osd_activate', kwargs=dict( osd_dev=d ) )\
+        s_activate.module.run( name='ceph.osd_activate', kwargs=dict( osd_dev=d, cluster_uuid=fsid ) )\
         .require( s_prepare.module )
 
