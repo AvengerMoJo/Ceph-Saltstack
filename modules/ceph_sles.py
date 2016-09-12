@@ -7,6 +7,8 @@
 
 # Import Python libs for logging
 import logging
+log = logging.getLogger(__name__)
+
 import os
 import re
 import socket
@@ -20,12 +22,22 @@ import StringIO
 import salt.modules.cmdmod as salt_cmd
 import salt.modules.saltutil as saltutil
 import salt.utils as salt_utils 
-# import salt.modules.pkg as salt_pkg
+#import salt.modules.pkg as salt_pkg
 
+import salt.modules.test as tool
+log.debug('Salt version : ' + str(tool.version()) )
+if tool.version().startswith('2014'):
+	version = 2014
+elif tool.version().startswith('2015'):
+	version = 2015
+else:
+	version = 2016
 
-log = logging.getLogger(__name__)
-log.debug('Loading ssh key from admin node')
-
+# take out cmd.shell hard code to make sure different version has the same result
+if version > 2014:
+	shell_cmd = 'cmd.shell'
+else:
+	shell_cmd = 'cmd.run'
 
 __virtual_name__ = 'ceph_sles'
 
@@ -33,23 +45,13 @@ def __virtual__():
 	#if __grains__.get('os',False) != 'SLES':
 		#return False
 	#if pkg.version('ceph',False) < '0.94':
-	#if not salt_utils.which('ssh-keygen') :
-	#	log.info('Error ssh-keygen package not find, need to be installed' )
-	#	return False
-	#if not salt_utils.which('ssh-keyscan') :
-	#	log.info('Error ssh-keyscan package not find, need to be installed' )
-	#	return False
-	#if not salt_utils.which('sshpass') :
-	#	log.info('Error sshpass package not find, need to be installed' )
-	#	return False
 	if not salt_utils.which('lsblk') :
-		log.info('Error lsblk package not find, need to be installed' )
-		return False
+		log.error('Error lsblk package not find, need to be installed' )
+		#return False
 	if not salt_utils.which('iperf3') :
-		log.info('Error iperf3 package not find, need to be installed' )
-		return False
+		log.error('Error iperf3 package not find, need to be installed' )
+		#return False
 	return __virtual_name__
-	# return 'ceph_sles'
 
 def _bench_prep():
 	'''
@@ -75,14 +77,14 @@ def _disk_sector_size( dev ):
 	'''
 	# lsblk /dev/sda -o PHY-SEC,LOG-SEC
 	# /sys/block/sda/queue/hw_sector_size
-	size = __salt__['cmd.shell']('lsblk ' + dev + ' -o LOG-SEC | head -n 2 | tail -n 1', output_loglevel='debug' )
+	size = __salt__[shell_cmd]('lsblk ' + dev + ' -o LOG-SEC | head -n 2 | tail -n 1', output_loglevel='debug' )
 	return int(size)
 
 def _disk_last_part( dev ):
 	'''
 	get disk highest partition number 
 	'''
-	part = __salt__['cmd.shell']('parted ' + dev + ' print -m -s | tail -1 | cut -f 1 -d ":"', output_loglevel='debug' )
+	part = __salt__[shell_cmd]('parted ' + dev + ' print -m -s | tail -1 | cut -f 1 -d ":"', output_loglevel='debug' )
 	if part.isdigit():
 		return int(part)
 	else:
@@ -94,7 +96,7 @@ def _disk_remove_last_part( dev ):
 	'''
 	part = _disk_last_part( dev )
 	if part:
-		remove_part = __salt__['cmd.shell']('parted ' + dev + ' rm ' + str(part), output_loglevel='debug' )
+		remove_part = __salt__[shell_cmd]('parted ' + dev + ' rm ' + str(part), output_loglevel='debug' )
 
 def _disk_new_part( dev, part_size ):
 	'''
@@ -140,15 +142,15 @@ def _fstab_remove_part( part ):
 	'''
 	remove partition mount point from fstab
 	'''
-	cp_fstab= __salt__['cmd.shell']('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug' )
-	remove_part = __salt__['cmd.shell']('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab', output_loglevel='debug' )
+	cp_fstab= __salt__[shell_cmd]('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug' )
+	remove_part = __salt__[shell_cmd]('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab', output_loglevel='debug' )
 
 def _fstab_add_part( part, path ):
 	'''
 	put in the new partition and mount point into fstab
 	'''
 	_fstab_remove_part( part )
-	add_part = __salt__['cmd.shell']('echo "/dev/disk/by-id/' + part + ' ' + path +
+	add_part = __salt__[shell_cmd]('echo "/dev/disk/by-id/' + part + ' ' + path +
 	' xfs	rw,defaults,noexec,nodev,noatime,nodiratime,nobarrier 0 0  ">> /etc/fstab', output_loglevel='debug' )
 
 def _ip_info():
@@ -164,7 +166,7 @@ def _list_osd_files():
 	return line seperated list of osd directory in /var/lib/ceph/osd
 	'''
 	osd_path = '/var/lib/ceph/osd/'
-	possible_osd = __salt__['cmd.shell']('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
+	possible_osd = __salt__[shell_cmd]('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
 	return possible_osd
 
 def _lsblk_list_all():
@@ -185,7 +187,7 @@ def _parted_start( dev ):
 	'''
 	get disk partition free sector start number 
 	'''
-	start = __salt__['cmd.shell']('parted -m -s ' + dev +
+	start = __salt__[shell_cmd]('parted -m -s ' + dev +
 		' unit s print free | grep free  | sort -t : -k 4n -k 2n  | tail -n 1 | cut -f 2 -d ":" | cut -f 1 -d "s" ', output_loglevel='debug' )
 	return int(start)
 
@@ -575,21 +577,21 @@ def new_mon( *node_names ):
 	if len(node_names) > 1:
 		for node in node_names:
 			output += "Copy monkey, monmap to node -> " + node + ":\n"
-			output += __salt__['cmd.shell']('salt-cp "' + node + '" ' + mon_key_filename +\
+			output += __salt__[shell_cmd]('salt-cp "' + node + '" ' + mon_key_filename +\
 			' /tmp/' + mon_keyring_name  , output_loglevel='debug' ) + '\n'
-			output += __salt__['cmd.shell']('salt-cp "' + node + '" ' + monmap_filename +\
+			output += __salt__[shell_cmd]('salt-cp "' + node + '" ' + monmap_filename +\
 			' /tmp/monmap' , output_loglevel='debug' ) + '\n'
-			output += __salt__['cmd.shell']('salt "' + node + '" ceph_sles.purge_mon', output_loglevel='debug' ) + '\n'
-			output += __salt__['cmd.shell']('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
-			output += __salt__['cmd.shell']('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
+			output += __salt__[shell_cmd]('salt "' + node + '" ceph_sles.purge_mon', output_loglevel='debug' ) + '\n'
+			output += __salt__[shell_cmd]('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
+			output += __salt__[shell_cmd]('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
 	else:
 		output += "Copy monkey, monmap to node -> " + node + ":\n"
-		output += __salt__['cmd.shell']('salt-cp "' + str(node_names[0]) + '" ' + mon_key_filename +\
+		output += __salt__[shell_cmd]('salt-cp "' + str(node_names[0]) + '" ' + mon_key_filename +\
 		' /tmp/' + mon_keyring_name  , output_loglevel='debug' ) + '\n'
-		output += __salt__['cmd.shell']('salt-cp "' + str(node_names[0]) + '" ' + monmap_filename +\
+		output += __salt__[shell_cmd]('salt-cp "' + str(node_names[0]) + '" ' + monmap_filename +\
 		' ' + monmap_filename, output_loglevel='debug' ) + '\n'
-		output += __salt__['cmd.shell']('salt "' + str(node_names[0]) + '" ceph_sles.purge_mon', output_loglevel='debug' ) + '\n'
-		output += __salt__['cmd.shell']('salt "' + str(node_names[0]) + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
+		output += __salt__[shell_cmd]('salt "' + str(node_names[0]) + '" ceph_sles.purge_mon', output_loglevel='debug' ) + '\n'
+		output += __salt__[shell_cmd]('salt "' + str(node_names[0]) + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
 
 
 	output += "Push conf to " + str(node_names) + ":\n"
@@ -644,9 +646,9 @@ def purge_mon():
 	mon_dir = '/var/lib/ceph/mon/ceph-' + node
 	keyring_files = '/var/lib/ceph/bootstrap-mds/ceph.keyring /var/lib/ceph/bootstrap-osd/ceph.keyring /var/lib/ceph/bootstrap-rgw/ceph.keyring'
 	output = str( __salt__['service.stop']('ceph-mon@'+node) )
-	output += __salt__['cmd.shell']('rm -rf ' + mon_dir + '/',  output_loglevel='debug')
-	output += __salt__['cmd.shell']('rm -rf ' + keyring_files ,  output_loglevel='debug')
-	output += __salt__['cmd.shell']('rm -rf ' + ceph_conf_dir ,  output_loglevel='debug')
+	output += __salt__[shell_cmd]('rm -rf ' + mon_dir + '/',  output_loglevel='debug')
+	output += __salt__[shell_cmd]('rm -rf ' + keyring_files ,  output_loglevel='debug')
+	output += __salt__[shell_cmd]('rm -rf ' + ceph_conf_dir ,  output_loglevel='debug')
 	return output
 
 def push_conf( *node_names ):
@@ -772,14 +774,14 @@ def bench_rados():
 	_bench_prep()
 
 	for pool in pool_names:
-		bench_result = __salt__['cmd.shell']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time*2) + ' write --no-cleanup', output_loglevel='debug' )
+		bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time*2) + ' write --no-cleanup', output_loglevel='debug' )
 		rep2_log = bench_path + '/' + pool + '_pool_2_write_default_nocleanup.log' 
 		logfile = open( rep2_log ,  "w" )
 		logfile.write( bench_result )
 		logfile.close()
 		os.chown( rep2_log, 1000, 100 )
 
-		bench3_result = __salt__['cmd.shell']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', output_loglevel='debug' )
+		bench3_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', output_loglevel='debug' )
 		rep3_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log' 
 		logfile = open( rep3_log ,  "w" )
 		logfile.write( bench3_result )
@@ -787,28 +789,28 @@ def bench_rados():
 		os.chown( rep3_log, 1000, 100 )
 
 		for thread in thread_counts:
-			bench_result = __salt__['cmd.shell']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
+			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
 			rep2_log = bench_path + '/' + pool + '_pool_2_rand_thread_' + str(thread) + '.log' 
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
 			os.chown( rep2_log, 1000, 100 )
 
-			bench_result = __salt__['cmd.shell']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
+			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
 			rep3_log = bench_path + '/' + pool + '_pool_3_rand_thread_' + str(thread) + '.log' 
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
 			os.chown( rep3_log, 1000, 100 )
 
-			bench_result = __salt__['cmd.shell']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
+			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
 			rep2_log = bench_path + '/' + pool + '_pool_2_seq_thread_' + str(thread) + '.log' 
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
 			os.chown( rep2_log, 1000, 100 )
 
-			bench_result = __salt__['cmd.shell']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
+			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
 			rep3_log = bench_path + '/' + pool + '_pool_3_seq_thread_' + str(thread) + '.log' 
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
@@ -816,14 +818,14 @@ def bench_rados():
 			os.chown( rep3_log, 1000, 100 )
 
 		for thread in thread_counts:
-			bench_result = __salt__['cmd.shell']('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' write -t ' + str(thread), output_loglevel='debug' )
+			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' write -t ' + str(thread), output_loglevel='debug' )
 			rep2_log = bench_path + '/' + pool + '_pool_2_write_thread_' + str(thread) + '.log' 
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
 			os.chown( rep2_log, 1000, 100 )
 
-			bench_result = __salt__['cmd.shell']('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' write -t ' + str(thread), output_loglevel='debug' )
+			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' write -t ' + str(thread), output_loglevel='debug' )
 			rep3_log = bench_path + '/' + pool + '_pool_3_write_thread_' + str(thread) + '.log' 
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
@@ -867,7 +869,7 @@ def bench_fio():
 	_bench_prep()
 
 	for pool in pool_names:
-		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting --pool='+ pool + '_pool_2', output_loglevel='debug' )
+		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting --pool='+ pool + '_pool_2', output_loglevel='debug' )
 
 		fio2_log = bench_path + '/' + pool + '_fio_4K_randwrite.log'
 		logfile = open( fio2_log,  "w" )
@@ -875,7 +877,7 @@ def bench_fio():
 		logfile.close()
 		os.chown( fio2_log, 1000, 100 )
 
-		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting --pool='+ pool + '_pool_2', output_loglevel='debug' )
+		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting --pool='+ pool + '_pool_2', output_loglevel='debug' )
 
 		fio2_log = bench_path + '/' + pool + '_fio_64K_randwrite.log'
 		logfile = open( fio2_log,  "w" )
@@ -883,7 +885,7 @@ def bench_fio():
 		logfile.close()
 		os.chown( fio2_log, 1000, 100 )
 
-		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
+		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
 
 		fio3_log = bench_path + '/' + pool + '_fio_4K_randwrite.log' 
 		logfile = open( fio3_log ,  "w" )
@@ -891,7 +893,7 @@ def bench_fio():
 		logfile.close()
 		os.chown( fio3_log, 1000, 100 )
 
-		fio_result = __salt__['cmd.shell']('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
+		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
 
 		fio3_log = bench_path + '/' + pool + '_fio_64K_randwrite.log' 
 		logfile = open( fio3_log ,  "w" )
@@ -918,13 +920,13 @@ def clean_disk_partition( partlist=None):
 	output = ""
 
 	for part in part_list:
-		mount = __salt__['cmd.shell']('mount | grep ' + part + ' | cut -f 1 -d \' \'' )
+		mount = __salt__[shell_cmd]('mount | grep ' + part + ' | cut -f 1 -d \' \'' )
 		if mount:
 			output = 'Umount ' + mount + '\n'
-			output += __salt__['cmd.shell']('umount ' + mount  )
+			output += __salt__[shell_cmd]('umount ' + mount  )
 		disk_zap = 'Remove Partition ' + part + '\n'
-		disk_zap += __salt__['cmd.shell']('ceph-disk zap ' + part , output_loglevel='debug' )
-		disk_zap += __salt__['cmd.shell']('partx -a ' + part , output_loglevel='debug' )
+		disk_zap += __salt__[shell_cmd]('ceph-disk zap ' + part , output_loglevel='debug' )
+		disk_zap += __salt__[shell_cmd]('partx -a ' + part , output_loglevel='debug' )
 	return output + '\n' + disk_zap
 
 def clean_disk_partition_old( nodelist=None, partlist=None):
@@ -978,7 +980,7 @@ def disk_info():
 	.. code-block:: bash
 	salt 'node1' ceph_sles.disk_info 
         '''
-	result = __salt__['cmd.shell']('lsblk | grep ^sd*', output_loglevel='debug')
+	result = __salt__[shell_cmd]('lsblk | grep ^sd*', output_loglevel='debug')
 	dev_names = re.findall( r'(?P<disk_name>sd.).*', result )
 	hdd_list = []
 	ssd_list = []
@@ -991,8 +993,6 @@ def disk_info():
 			ssd_list.append( dev_name )
 			result = re.sub(r'('+dev_name+'.*)disk', r'\1ssd disk', result) 
 	out_log = result
-	#out_log = out_log + "\nhdd: \n" + ",".join(hdd_list)
-	#out_log = out_log + "\nssd: \n" + ",".join(ssd_list)
 	return out_log
 
 def prep_osd_journal( partition_dev, part_size ):
@@ -1056,7 +1056,7 @@ def prep_osd( nodelist=None, partlist=None, journal_path=None):
 	node_list = nodelist.split(",")
 	part_list = partlist.split(",")
 
-	new_osd_id = __salt__['cmd.shell']('ceph osd ls | tail -n 1', output_loglevel='debug', env={'HOME':'/root'} )
+	new_osd_id = __salt__[shell_cmd]('ceph osd ls | tail -n 1', output_loglevel='debug', env={'HOME':'/root'} )
 
 	if not new_osd_id:
 		osd_num = 0
@@ -1091,8 +1091,8 @@ def list_osd():
 		return "There is file in osd default path, assume no OSD in this node." 
 	for osd in osd_list:
 		if osd:
-			mounted_osd += "\n" + __salt__['cmd.shell']('mount | grep ' + osd + '| cut -f 3 -d " "' , output_loglevel='debug')
-			mounted_osd += "\t" + __salt__['cmd.shell']('mount | grep ' + osd + '| cut -f 1 -d " "' , output_loglevel='debug')
+			mounted_osd += "\n" + __salt__[shell_cmd]('mount | grep ' + osd + '| cut -f 3 -d " "' , output_loglevel='debug')
+			mounted_osd += "\t" + __salt__[shell_cmd]('mount | grep ' + osd + '| cut -f 1 -d " "' , output_loglevel='debug')
 			file_list += "\n" + osd
 	return "Possible OSD is not clean in /var/lib/ceph/osd/ :\n" + file_list + "\n\nCurrently mounted osd :\t Mount point:\n" + mounted_osd
 
@@ -1112,7 +1112,7 @@ def purge_osd( *osd_num ):
 	for remove_osd in osd_num:
 		stop += str( __salt__['service.stop']('ceph-osd@' + str(remove_osd)))
 		for ceph_path in _list_osd_files().split("\n"):
-			mounted = __salt__['cmd.shell']('mount | grep "' + ceph_path + '"| grep ceph-' + str(remove_osd) + '| cut -f 3 -d " "', output_loglevel='debug')
+			mounted = __salt__[shell_cmd]('mount | grep "' + ceph_path + '"| grep ceph-' + str(remove_osd) + '| cut -f 3 -d " "', output_loglevel='debug')
 			if mounted:
 				clean_log += 'umount ' + mounted + '\n'
 				clean_log += _umount_path( mounted ) + '\n'
@@ -1196,7 +1196,7 @@ def _crushmap_root_disktype_output( disk_type, next_id, osd_weight_total ):
 	return output
 
 def _osd_tree_obj():
-	tree_view_json =  __salt__['cmd.shell']('ceph osd tree --format json 2> /dev/null | grep {', output_loglevel='debug', cwd='/etc/ceph', runas='ceph' )
+	tree_view_json =  __salt__[shell_cmd]('ceph osd tree --format json 2> /dev/null | grep {', output_loglevel='debug', cwd='/etc/ceph', runas='ceph' )
 	tree_view = json.loads( tree_view_json )
 	return tree_view
 
