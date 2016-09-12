@@ -17,6 +17,7 @@ import getopt
 import json
 import fileinput
 import StringIO
+import pwd
 
 # Import salt library for running remote commnad
 import salt.modules.cmdmod as salt_cmd
@@ -598,16 +599,8 @@ def new_mon( *node_names ):
 
 	output += "Push conf to " + str(node_names) + ":\n"
 	push_conf( *node_names )
-
-	#if len(node_names) > 1:
-		#for node in node_names:
-			#output += "Create Keys " + node + ":\n"
-			#output += __salt__['cmd.run']('salt "' + node + '" ceph_sles.create_keys_all' , output_loglevel='debug' )
-	#else:
-		#output += "Create Keys " + node_names[0] + ":\n"
-		#output += __salt__['cmd.run']('salt "' + str(node_names[0]) + '" ceph_sles.create_keys_all' , output_loglevel='debug' )
 	
-	#return output
+	return output
 
 def new_mon_old( *node_names ):
 	'''
