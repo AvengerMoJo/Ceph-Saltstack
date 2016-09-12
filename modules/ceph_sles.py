@@ -27,12 +27,14 @@ import salt.utils as salt_utils
 
 import salt.modules.test as tool
 log.debug('Salt version : ' + str(tool.version()) )
+version = 2016 
+# run command as user who? older version user as root now as ceph
+ceph_user_as = 'ceph'
 if tool.version().startswith('2014'):
 	version = 2014
+	ceph_user_as = 'root'
 elif tool.version().startswith('2015'):
 	version = 2015
-else:
-	version = 2016
 
 ceph_uid = pwd.getpwnam('ceph').pw_uid
 
@@ -311,11 +313,10 @@ def create_mon_node():
 	mon_map_file = '/tmp/'+ mon_map
 	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
 
-	#output = __salt__['cmd.run']('mkdir -p ' + mon_dir, output_loglevel='debug' )
-	output = __salt__['cmd.run']('mkdir -p ' + mon_dir, output_loglevel='debug', runas='ceph' )
+	output = __salt__['cmd.run']('mkdir -p ' + mon_dir, output_loglevel='debug', runas=ceph_user_as )
 	output += __salt__['cmd.run']('ceph-mon --mkfs -i ' + node + ' --monmap ' + mon_map_file + ' --keyring ' +\
-	mon_key_file, output_loglevel='debug', runas='ceph' )
-	output += __salt__['cmd.run']('touch ' + mon_dir + '/done', output_loglevel='debug', runas='ceph' )
+	mon_key_file, output_loglevel='debug', runas=ceph_user_as )
+	output += __salt__['cmd.run']('touch ' + mon_dir + '/done', output_loglevel='debug', runas=ceph_user_as )
 	output += '\nEnabling ceph target service '+ node + ':' + str( __salt__['service.enable']('ceph.target') )
 	output += '\nEnabling ceph-mon at '+ node + ':' + str( __salt__['service.enable']('ceph-mon@'+node) )
 	output += '\nStarting ceph-mon at '+ node + ':' + str( __salt__['service.start']('ceph-mon@'+node) )
@@ -585,7 +586,6 @@ def new_mon( *node_names ):
 			output += __salt__[shell_cmd]('salt-cp "' + node + '" ' + monmap_filename +\
 			' /tmp/monmap' , output_loglevel='debug' ) + '\n'
 			output += __salt__[shell_cmd]('salt "' + node + '" ceph_sles.purge_mon', output_loglevel='debug' ) + '\n'
-			output += __salt__[shell_cmd]('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
 			output += __salt__[shell_cmd]('salt "' + node + '" ceph_sles.create_mon_node ', output_loglevel='debug' ) + '\n'
 	else:
 		output += "Copy monkey, monmap to node -> " + node + ":\n"
