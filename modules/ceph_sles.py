@@ -33,6 +33,8 @@ elif tool.version().startswith('2015'):
 else:
 	version = 2016
 
+ceph_uid = pwd.getpwnam('ceph').pw_uid
+
 # take out cmd.shell hard code to make sure different version has the same result
 if version > 2014:
 	shell_cmd = 'cmd.shell'
@@ -475,7 +477,7 @@ def new_ceph_cfg( *node_names ):
 	logfile = open( ceph_config_file ,  "w" )
 	logfile.write( config_out )
 	logfile.close()
-	os.chown( ceph_config_file, 1000, 100 )
+	os.chown( ceph_config_file, ceph_uid, 100 )
 
 	salt_ceph_config_file = salt_ceph_config_path + '/' + 'ceph.conf' 
 	salt_file = open( salt_ceph_config_file ,  "w" )
@@ -555,7 +557,7 @@ def new_mon( *node_names ):
 	logfile = open( ceph_config_file ,  "w" )
 	logfile.write( config_out )
 	logfile.close()
-	os.chown( ceph_config_file, 1000, 100 )
+	os.chown( ceph_config_file, ceph_uid, 100 )
 
 	mon_key_filename =  ceph_config_path + '/' + mon_keyring_name 
 	admin_key_filename = ceph_config_path + '/' + admin_keyring_name
@@ -679,7 +681,7 @@ def push_conf( *node_names ):
 	# need to change permission 
 	# /etc/ceph/ceph.client.admin.keyring
 	# ceph_key = '/etc/ceph/ceph.client.admin.keyring'
-	# os.chown( ceph_key, 1000, 100 )
+	# os.chown( ceph_key, ceph_uid, 100 )
 	
 	return out_log
 
@@ -779,14 +781,14 @@ def bench_rados():
 		logfile = open( rep2_log ,  "w" )
 		logfile.write( bench_result )
 		logfile.close()
-		os.chown( rep2_log, 1000, 100 )
+		os.chown( rep2_log, ceph_uid, 100 )
 
 		bench3_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', output_loglevel='debug' )
 		rep3_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log' 
 		logfile = open( rep3_log ,  "w" )
 		logfile.write( bench3_result )
 		logfile.close()
-		os.chown( rep3_log, 1000, 100 )
+		os.chown( rep3_log, ceph_uid, 100 )
 
 		for thread in thread_counts:
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
@@ -794,28 +796,28 @@ def bench_rados():
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
-			os.chown( rep2_log, 1000, 100 )
+			os.chown( rep2_log, ceph_uid, 100 )
 
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
 			rep3_log = bench_path + '/' + pool + '_pool_3_rand_thread_' + str(thread) + '.log' 
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
-			os.chown( rep3_log, 1000, 100 )
+			os.chown( rep3_log, ceph_uid, 100 )
 
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
 			rep2_log = bench_path + '/' + pool + '_pool_2_seq_thread_' + str(thread) + '.log' 
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
-			os.chown( rep2_log, 1000, 100 )
+			os.chown( rep2_log, ceph_uid, 100 )
 
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
 			rep3_log = bench_path + '/' + pool + '_pool_3_seq_thread_' + str(thread) + '.log' 
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
-			os.chown( rep3_log, 1000, 100 )
+			os.chown( rep3_log, ceph_uid, 100 )
 
 		for thread in thread_counts:
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' write -t ' + str(thread), output_loglevel='debug' )
@@ -823,14 +825,14 @@ def bench_rados():
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
-			os.chown( rep2_log, 1000, 100 )
+			os.chown( rep2_log, ceph_uid, 100 )
 
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' write -t ' + str(thread), output_loglevel='debug' )
 			rep3_log = bench_path + '/' + pool + '_pool_3_write_thread_' + str(thread) + '.log' 
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
-			os.chown( rep3_log, 1000, 100 )
+			os.chown( rep3_log, ceph_uid, 100 )
 
 	remove_pool( 'ssd_pool_2' )
 	remove_pool( 'ssd_pool_3' )
@@ -875,7 +877,7 @@ def bench_fio():
 		logfile = open( fio2_log,  "w" )
 		logfile.write( fio_result )
 		logfile.close()
-		os.chown( fio2_log, 1000, 100 )
+		os.chown( fio2_log, ceph_uid, 100 )
 
 		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_2_test --group_reporting --pool='+ pool + '_pool_2', output_loglevel='debug' )
 
@@ -883,7 +885,7 @@ def bench_fio():
 		logfile = open( fio2_log,  "w" )
 		logfile.write( fio_result )
 		logfile.close()
-		os.chown( fio2_log, 1000, 100 )
+		os.chown( fio2_log, ceph_uid, 100 )
 
 		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
 
@@ -891,7 +893,7 @@ def bench_fio():
 		logfile = open( fio3_log ,  "w" )
 		logfile.write( fio_result )
 		logfile.close()
-		os.chown( fio3_log, 1000, 100 )
+		os.chown( fio3_log, ceph_uid, 100 )
 
 		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
 
@@ -899,7 +901,7 @@ def bench_fio():
 		logfile = open( fio3_log ,  "w" )
 		logfile.write( fio_result )
 		logfile.close()
-		os.chown( fio3_log, 1000, 100 )
+		os.chown( fio3_log, ceph_uid, 100 )
 
 	remove_pool( 'ssd_pool_2' )
 	remove_pool( 'ssd_pool_3' )
