@@ -33,7 +33,7 @@ ceph_user_as = 'ceph'
 if tool.version().startswith('2014'):
 	version = 2014
 	ceph_user_as = 'root'
-elif tool.version().startswith('2015'):
+else:
 	version = 2015
 
 ceph_uid = pwd.getpwnam('ceph').pw_uid
@@ -314,6 +314,7 @@ def create_mon_node():
 	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
 
 	output = __salt__['cmd.run']('mkdir -p ' + mon_dir, output_loglevel='debug', runas=ceph_user_as )
+	output += '\nRunning ceph-mon --mkfs -i ' + node + ' --monmap ' + mon_map_file + ' --keyring ' + mon_key_file 
 	output += __salt__['cmd.run']('ceph-mon --mkfs -i ' + node + ' --monmap ' + mon_map_file + ' --keyring ' +\
 	mon_key_file, output_loglevel='debug', runas=ceph_user_as )
 	output += __salt__['cmd.run']('touch ' + mon_dir + '/done', output_loglevel='debug', runas=ceph_user_as )
@@ -568,7 +569,7 @@ def new_mon( *node_names ):
 	output += "Create mon key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + mon_key_filename + \
 	' --gen-key -n mon. --cap mon "allow *"', output_loglevel='debug', runas='ceph' ) + '\n'
 	output += "Create admin key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + admin_key_filename + \
-	' --gen-key -n client.admin --set-uid=0 --cap mon "allow *" --cap osd "allow *" --cap mds "allow"',\
+	' --gen-key -n client.admin --set-uid=0 --cap mon "allow *" --cap osd "allow *" --cap mds "allow *"',\
 	 output_loglevel='debug', runas='ceph' ) + '\n'
 
 
@@ -919,9 +920,9 @@ def clean_disk_partition( partlist=None):
 		if mount:
 			output = 'Umount ' + mount + '\n'
 			output += __salt__[shell_cmd]('umount ' + mount  )
-		disk_zap = 'Remove Partition ' + part + '\n'
+		disk_zap += '\nRemove Partition ' + part + '\n'
 		disk_zap += __salt__[shell_cmd]('ceph-disk zap ' + part , output_loglevel='debug' )
-		disk_zap += __salt__[shell_cmd]('partx -a ' + part , output_loglevel='debug' )
+		disk_zap += __salt__[shell_cmd]('partx -a ' + part , output_loglevel='debug' ) + '\n'
 	return output + '\n' + disk_zap
 
 def clean_disk_partition_old( nodelist=None, partlist=None):
