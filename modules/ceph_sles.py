@@ -795,7 +795,7 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 			#iperf_out += '\n i= ' + str(i) + ' node = ' + str(node)
 			for x in range(0, thread_per_node ):
 				base = (i * thread_per_node) + x
-				iperf_out +=  '\n node ' + node + ' ' + str(i%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node + '\n'
+				iperf_out +=  '\n node ' + node + ' ' + str(x%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node + '\n'
 				log_count.append( __salt__['cmd.run']('/usr/bin/salt --async "' + node + '" ceph_sles.iperf ' + str(i%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) + '\n')
 		#for log in log_count:
 		#	iperf_out += log
