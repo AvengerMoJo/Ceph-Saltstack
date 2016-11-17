@@ -700,7 +700,7 @@ def bench_disk( *disk_dev ):
 
 def bench_network( master_node, *client_node ):
 	'''
-	Get all the disk device from nodes
+	Run iperf from master_node and then call from all client_nodes 
 
 	CLI Example:
 
@@ -720,6 +720,98 @@ def bench_network( master_node, *client_node ):
 				iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -c ' + master_node + ' -d' , output_loglevel='debug')
 				break
 	return iperf_out 
+
+def iperf( cpu_num, port_num, server ):
+	'''
+	Use async call to record iperf 100s to server with a specific CPU and port number 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node' ceph_sles.iperf cpu_number port_number server
+	'''
+
+	outpath = '/tmp/iperf/'
+
+	if not os.path.exists( outpath ):
+		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + outpath, output_loglevel='debug', runas='ceph' )
+
+	outfile = outpath + server + '.c' + str(cpu_num) + '.' + str(port_num) + '.iperf.dat'
+	ceph_info_out = open( outfile,  "w" )
+
+	iperf_log = __salt__['cmd.run']('/usr/bin/iperf3 -f M -t 100 -A ' + str(cpu_num) + ' -c ' + server + ' -p ' + str(port_num) , output_loglevel='debug', runas='ceph')
+
+	ceph_info_out.write( iperf_log )
+	ceph_info_out.close()
+
+	return iperf_log
+
+def read_iperf( cpu_num, port_num, server ):
+	'''
+	Read all the output all and add the total together. 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'node' ceph_sles.read_iperf cpu_number port_number server
+	'''
+	result = 0
+
+	outpath = '/tmp/iperf/'
+
+	outfile = outpath + server + '.c' + str(cpu_num) + '.' + str(port_num) + '.iperf.dat'
+
+	result = __salt__[shell_cmd]('grep sender ' + outfile + '| grep 0.00-100.00 | cut -d " " -f 13', output_loglevel='debug')
+
+	return 'Bandwidth:' + result.strip()
+
+
+def bench_network_mcore( thread_num, master_node, *client_node ):
+	'''
+	Run iperf from master_node and then call from all client_nodes 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.bench_network thread_number test_node client1 client2 client3 ... 
+	'''
+	import multiprocessing
+	core_num = multiprocessing.cpu_count()
+	total    = 0.0
+	iperf_out = ""
+	log_count = []
+	iperf_result = []
+	node_name = socket.gethostname()
+
+	if node_name == master_node:
+		state_iperf = __salt__['state.sls']('iperf')
+		#iperf_out += __salt__['state.sls']('iperf')
+		for i in range(1, thread_num+1):
+			log_count.append(  __salt__['cmd.run']('/usr/bin/iperf3 -f M -A ' + str(i%core_num) + ' -p 53' + ("%02d"%(i,)) + '  -s -D', output_loglevel='debug') )
+
+		thread_per_node = ( thread_num / len(client_node) )
+		#iperf_out +='\n thread = ' + str(thread_per_node)
+		for i, node in enumerate( client_node ):
+			#iperf_out += '\n i= ' + str(i) + ' node = ' + str(node)
+			for x in range(0, thread_per_node ):
+				base = (i * thread_per_node) + x
+				iperf_out +=  '\n node ' + node + ' ' + str(i%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node + '\n'
+				log_count.append( __salt__['cmd.run']('/usr/bin/salt --async "' + node + '" ceph_sles.iperf ' + str(i%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) + '\n')
+		#for log in log_count:
+		#	iperf_out += log
+
+		time.sleep(100) # delays for 15 seconds
+
+		for i, node in enumerate( client_node ):
+			for x in range(0, thread_per_node ):
+				base = (i * thread_per_node) + x
+				tmp =  __salt__['cmd.run']('/usr/bin/salt "' + node + '" ceph_sles.read_iperf ' + str(i%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) 
+				m = re.search('(?<=Bandwidth:)\d+\.\d+', tmp)
+				iperf_result.append( m.group(0) )
+		for counter in iperf_result:
+			total += float(counter)
+	#return iperf_out + "\nTotal bandwidth = " + str(total) + "\n"
+	return "\nTotal bandwidth = " + str(total) + "M"
 
 def bench_test_ruleset( replication_size=3 ):
 	'''
