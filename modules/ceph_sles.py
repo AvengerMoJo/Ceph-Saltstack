@@ -796,7 +796,7 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 			for x in range(0, thread_per_node ):
 				base = (i * thread_per_node) + x
 				iperf_out +=  '\n node ' + node + ' ' + str(x%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node + '\n'
-				log_count.append( __salt__['cmd.run']('/usr/bin/salt --async "' + node + '" ceph_sles.iperf ' + str(i%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) + '\n')
+				log_count.append( __salt__['cmd.run']('/usr/bin/salt --async "' + node + '" ceph_sles.iperf ' + str(x%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) + '\n')
 		#for log in log_count:
 		#	iperf_out += log
 
@@ -805,9 +805,10 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 		for i, node in enumerate( client_node ):
 			for x in range(0, thread_per_node ):
 				base = (i * thread_per_node) + x
-				tmp =  __salt__['cmd.run']('/usr/bin/salt "' + node + '" ceph_sles.read_iperf ' + str(i%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) 
+				tmp =  __salt__['cmd.run']('/usr/bin/salt "' + node + '" ceph_sles.read_iperf ' + str(x%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) 
 				m = re.search('(?<=Bandwidth:)\d+\.\d+', tmp)
-				iperf_result.append( m.group(0) )
+				if m :
+					iperf_result.append( m.group(0) )
 		for counter in iperf_result:
 			total += float(counter)
 	#return iperf_out + "\nTotal bandwidth = " + str(total) + "\n"
