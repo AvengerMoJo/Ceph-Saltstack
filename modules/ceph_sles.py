@@ -20,6 +20,7 @@ import StringIO
 import pwd
 
 # Import salt library for running remote commnad
+import salt.modules.cp as cp
 import salt.modules.cmdmod as salt_cmd
 import salt.modules.saltutil as saltutil
 import salt.utils as salt_utils 
@@ -327,13 +328,41 @@ def create_mon_node():
 
 def create_keys_all():
 	'''
-        Node creating mon with fsid and key file from master
+        Get into all mon node and create all bootstrap key and send it back to admin nod
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.create_key_node
+	salt 'salt-master' ceph_sles.create_keys_all
 	'''
+	output = ''
+	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+        ceph_config_file = ceph_config_path + '/' + 'ceph.conf'
+	sm_cache_path = '/var/cache/salt/master/minions' 
+
+	mds_bs_key = '/var/lib/ceph/bootstrap-mds/ceph.keyring'
+	osd_bs_key = '/var/lib/ceph/bootstrap-osd/ceph.keyring'
+	rgw_bs_key = '/var/lib/ceph/bootstrap-rgw/ceph.keyring'
+
+
+	mon_ips  = __salt__[shell_cmd]('grep mon_host ' + ceph_config_file + '| cut -d "=" -f 2', output_loglevel='debug')
+	mon_nodes= __salt__[shell_cmd]('grep mon_initial_members ' + ceph_config_file + '| cut -d "=" -f 2', output_loglevel='debug')
+	if mon_nodes:
+		node_names = mon_nodes.strip().split(',')
+
+	for node in node_names:
+		output += __salt__['cmd.run']('/usr/bin/salt "' + node.strip() + '" ceph_sles.create_bootstrap_keys',  output_loglevel='debug' ) + '\n'
+
+	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + mds_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + osd_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + rgw_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ mds_bs_key + ' ' + mds_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ osd_bs_key + ' ' + osd_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ rgw_bs_key + ' ' + rgw_bs_key ,  output_loglevel='debug' ) + '\n'
+		
+	return output
+
+def create_bootstrap_keys():
 	node = socket.gethostname()
 	output = ''
 	output += __salt__['cmd.run']('ceph-create-keys --cluster ceph --id ' + node, output_loglevel='debug', env={ 'HOME':'/root'})
