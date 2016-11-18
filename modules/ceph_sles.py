@@ -806,9 +806,9 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 			for x in range(0, thread_per_node ):
 				base = (i * thread_per_node) + x
 				tmp =  __salt__['cmd.run']('/usr/bin/salt "' + node + '" ceph_sles.read_iperf ' + str(x%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) 
-				m = re.search('(?<=Bandwidth:)\d+\.\d+', tmp)
+				m = re.match(r'.*Bandwidth:(\d+\.?\d+)', tmp,  re.DOTALL)
 				if m :
-					iperf_result.append( m.group(0) )
+					iperf_result.append( m.group(1) )
 		for counter in iperf_result:
 			total += float(counter)
 	#return iperf_out + "\nTotal bandwidth = " + str(total) + "\n"
