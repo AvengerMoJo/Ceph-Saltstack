@@ -339,6 +339,11 @@ def create_keys_all():
 	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
         ceph_config_file = ceph_config_path + '/' + 'ceph.conf'
 	sm_cache_path = '/var/cache/salt/master/minions' 
+	sm_config = '/etc/salt/master' 
+
+	allow_receive = __salt__[shell_cmd]('grep file_recv ' + sm_config + '| grep True', output_loglevel='debug')
+	if not allow_receive:
+		return "Salt master require to enable file_recv: True to push file from minion.\n"
 
 	mds_bs_key = '/var/lib/ceph/bootstrap-mds/ceph.keyring'
 	osd_bs_key = '/var/lib/ceph/bootstrap-osd/ceph.keyring'
@@ -353,11 +358,18 @@ def create_keys_all():
 	for node in node_names:
 		output += __salt__['cmd.run']('/usr/bin/salt "' + node.strip() + '" ceph_sles.create_bootstrap_keys',  output_loglevel='debug' ) + '\n'
 
+	output += 'Calling /usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + mds_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + mds_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += 'Calling /usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + osd_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + osd_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += 'Calling /usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + rgw_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + rgw_bs_key ,  output_loglevel='debug' ) + '\n'
+
+	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ mds_bs_key + ' to ' + mds_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ mds_bs_key + ' ' + mds_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ osd_bs_key + ' to ' + mds_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ osd_bs_key + ' ' + osd_bs_key ,  output_loglevel='debug' ) + '\n'
+	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ rgw_bs_key + ' to ' + mds_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ rgw_bs_key + ' ' + rgw_bs_key ,  output_loglevel='debug' ) + '\n'
 		
 	return output
