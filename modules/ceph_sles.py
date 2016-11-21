@@ -784,15 +784,20 @@ def read_iperf( cpu_num, port_num, server ):
 	.. code-block:: bash
 	salt 'node' ceph_sles.read_iperf cpu_number port_number server
 	'''
-	result = 0
+	m = ""
+	result = ""
 
 	outpath = '/tmp/iperf/'
 
 	outfile = outpath + server + '.c' + str(cpu_num) + '.' + str(port_num) + '.iperf.dat'
 
-	result = __salt__[shell_cmd]('grep sender ' + outfile + '| grep 0.00-100.00 | cut -d " " -f 13', output_loglevel='debug')
-
-	return 'Bandwidth:' + result.strip()
+	result = __salt__[shell_cmd]('grep sender ' + outfile + '| grep 0.00-100.00', output_loglevel='debug')
+	
+	if result:
+		m = re.findall(r'(\d+\.?\d+) MBytes/sec', result)
+	if m[0]:
+		return 'Bandwidth:' + m[0]
+	return 'Bandwidth:0.0'
 
 
 def bench_network_mcore( thread_num, master_node, *client_node ):
@@ -804,6 +809,13 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 	.. code-block:: bash
 	salt 'salt-master' ceph_sles.bench_network thread_number test_node client1 client2 client3 ... 
 	'''
+
+	if len(client_node) < 1:
+		return "\n iperf client nodes list required\n"
+
+	if thread_num < len(client_node):
+		return "\n Input has " + str(len(client_node)) + " nodes, number of thread need to be at least that big\n"
+
 	import multiprocessing
 	core_num = multiprocessing.cpu_count()
 	total    = 0.0
@@ -811,6 +823,7 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 	log_count = []
 	iperf_result = []
 	node_name = socket.gethostname()
+	cal_error = ""
 
 	if node_name == master_node:
 		state_iperf = __salt__['state.sls']('iperf')
@@ -838,10 +851,14 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 				m = re.match(r'.*Bandwidth:(\d+\.?\d+)', tmp,  re.DOTALL)
 				if m :
 					iperf_result.append( m.group(1) )
+					if float(m.group(1)) == 0.0:
+						cal_error += "\nNode " + node + " Core " + str(x%core_num) + ' port 53' + ("%02d"%(base+1,)) + ' is 0.0M reduce the thread_num\n'
+				else:
+					cal_error += "\nNode " + node + " Core " + str(x%core_num) + ' port 53' + ("%02d"%(base+1,)) + ' is empty\n'
 		for counter in iperf_result:
 			total += float(counter)
 	#return iperf_out + "\nTotal bandwidth = " + str(total) + "\n"
-	return "\nTotal bandwidth = " + str(total) + "M"
+	return "\nTotal bandwidth = " + str(total) + "M\n"  + cal_error
 
 def bench_test_ruleset( replication_size=3 ):
 	'''
