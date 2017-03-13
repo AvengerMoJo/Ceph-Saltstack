@@ -720,6 +720,29 @@ def push_conf( *node_names ):
 	
 	return out_log
 
+def push_key( *node_names ):
+	'''
+	Send bootstrape key to OSD node
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.push_key osd_node1 osd_node2 osd_node3 ....
+	 '''
+	mds_bs_key = '/var/lib/ceph/bootstrap-mds/ceph.keyring'
+	osd_bs_key = '/var/lib/ceph/bootstrap-osd/ceph.keyring'
+	rgw_bs_key = '/var/lib/ceph/bootstrap-rgw/ceph.keyring'
+	out_log = ''
+	for node in node_names:
+		out_log += node + ':\n'
+		if salt_utils.istextfile( mds_bs_key ):
+			out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + mds_bs_key + ' ' + mds_bs_key, output_loglevel='debug' ) + '\n'
+		if salt_utils.istextfile( osd_bs_key ):
+			out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + osd_bs_key + ' ' + osd_bs_key, output_loglevel='debug' ) + '\n'
+		if salt_utils.istextfile( rgw_bs_key ):
+			out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + rgw_bs_key + ' ' + rgw_bs_key, output_loglevel='debug' ) + '\n'
+        return out_log
+
+
 def bench_disk( *disk_dev ):
 	'''
 	Get disk device direct read performance
