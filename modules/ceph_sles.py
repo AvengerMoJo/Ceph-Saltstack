@@ -367,9 +367,9 @@ def create_keys_all():
 
 	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ mds_bs_key + ' to ' + mds_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ mds_bs_key + ' ' + mds_bs_key ,  output_loglevel='debug' ) + '\n'
-	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ osd_bs_key + ' to ' + mds_bs_key + '\n'
+	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ osd_bs_key + ' to ' + osd_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ osd_bs_key + ' ' + osd_bs_key ,  output_loglevel='debug' ) + '\n'
-	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ rgw_bs_key + ' to ' + mds_bs_key + '\n'
+	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ rgw_bs_key + ' to ' + rgw_bs_key + '\n'
 	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ rgw_bs_key + ' ' + rgw_bs_key ,  output_loglevel='debug' ) + '\n'
 		
 	return output
@@ -1661,9 +1661,9 @@ def ntp_update( master_node ):
 	if node_name == master_node:
 		ntp_out = 'Starting ntpd ' + str( __salt__['service.start']('ntpd'))
 	else:
-		ntp_out = __salt__['cmd.run']('ntpdate -u salt-master' , output_loglevel='debug') +'\n'
-		ntp_out += __salt__['cmd.run']('ntpdate -u salt-master' , output_loglevel='debug') +'\n'
-		ntp_out += __salt__['cmd.run']('ntpdate -u salt-master' , output_loglevel='debug') +'\n'
+		ntp_out = __salt__['cmd.run']('ntpdate -u ' + master_node , output_loglevel='debug') +'\n'
+		ntp_out += __salt__['cmd.run']('ntpdate -u ' + master_node , output_loglevel='debug') +'\n'
+		ntp_out += __salt__['cmd.run']('ntpdate -u ' + master_node, output_loglevel='debug') +'\n'
 	return ntp_out
 
 def _radosgw_create_pool():
@@ -1780,9 +1780,11 @@ def create_rados_gateway( gateway_node ):
 	out += _rewrite_conf_gateway( gateway_node )
 	out += push_conf( gateway_node )
 	out += '\nEnabling radosgw service '+ gateway_node + ':\n' 
-	if pkg.version('ceph-radosgw',False) < '10.2':
+	out += '\nradosgw version : '+ __salt__['pkg.version']('ceph-radosgw') + ':\n' 
+	#if pkg.version('ceph-radosgw',False) < '10.2':
+	if '10.2' in __salt__['pkg.version']('ceph-radosgw'):
 		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph-radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
-		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph-.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
+		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph-radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
 	else:
 		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
 		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
@@ -1835,3 +1837,34 @@ def remove_cache_tier( pool_name ):
 	out += remove_pool( pool_name )  + '\n'
 
 	return out
+
+def new_mds():
+	'''
+        Create new mds servers 
+
+	CLI Example:
+
+	.. code-block:: bash
+	salt 'salt-master' ceph_sles.new_mds node1 node2 node3 ....
+	'''
+
+	bootstrap_mds_keyring = '/var/lib/ceph/bootstrap-mds/ceph.keyring'
+	if not os.path.isfile( bootstrap_mds_keyring ):
+		return '\n Missing keyring file ' + bootstrap_mds_keyring + ', please call create_keys_all\n'
+
+	node = socket.gethostname()
+	mds_node_path = '/var/lib/ceph/mds/ceph-' + node + '/'
+
+	if not os.path.exists( mds_node_path ):
+		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + mds_node_path, output_loglevel='debug', runas='ceph' )
+
+	out = __salt__['cmd.run']('/usr/bin/ceph --cluster ceph --name client.admin auth get-or-create mds.' + node + \
+	' osd "allow rwx" mds "allow *" mon "allow profile mds" -o /var/lib/ceph/mds/ceph-' + node + '/keyring',
+	output_loglevel='debug', env={'HOME':'/root'} )
+
+	out += '\nEnabling ceph mds service at '+ node + ':' + str( __salt__['service.enable']('ceph-mds@' + node) )
+	out += '\nStarting ceph mds service at '+ node + ':' + str( __salt__['service.start']('ceph-mon@' + node) )
+	out += '\nEnabling ceph target service '+ node + ':' + str( __salt__['service.enable']('ceph.target') )
+
+	return out
+
