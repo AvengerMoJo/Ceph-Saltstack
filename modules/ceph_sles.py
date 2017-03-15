@@ -753,12 +753,29 @@ def bench_disk( *disk_dev ):
 	salt 'node1' ceph_sles.bench_disk /dev/sda /dev/sdb ...
         '''
 	dev_list = '' 
+	mount_list = {}
 	for dev in disk_dev:
+		item = {}
 		if __salt__['file.is_blkdev'](dev):
-			dev_list = dev_list + dev + ' '
+			dev_list += dev + ' '
+			mount_point = __salt__[shell_cmd]('mount | grep ' + dev + ' | cut -f 3 -d \' \'' ) 
+			mount_list[dev] = mount_point
 	if dev_list == '':
 		return False
 	result = __salt__['cmd.run']('/sbin/hdparm -t ' + dev_list , output_loglevel='debug')
+
+	result += "\n\ndd Write performance\n" 
+	for dev, mount_point in mount_list.iteritems():
+		result += dev + '\n'
+		if mount_point != '':
+			result += '/usr/bin/dd if=/dev/zero of=' + mount_point + '/test conv=fdatasync bs=4K count=10000\n'
+			result += __salt__['cmd.run']('/usr/bin/dd if=/dev/zero of=' + mount_point + '/test bs=4K count=10000 conv=fdatasync' , output_loglevel='debug')
+			result += '\n'
+			__salt__['cmd.run']('/usr/bin/rm ' + mount_point + '/test' , output_loglevel='debug')
+		else: 
+			result += '/usr/bin/dd if=/dev/zero of=' + mount_point + ' conv=fdatasync bs=4K count=10000\n'
+			result += __salt__['cmd.run']('/usr/bin/dd if=/dev/zero of=' + mount_point + ' bs=4K count=10000 conv=fdatasync' , output_loglevel='debug')
+			result += '\n'
 	return result
 
 
