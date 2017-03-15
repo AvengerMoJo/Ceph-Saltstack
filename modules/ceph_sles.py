@@ -767,15 +767,15 @@ def bench_disk( *disk_dev ):
 	result += "\n\ndd Write performance\n" 
 	for dev, mount_point in mount_list.iteritems():
 		result += dev + '\n'
-		if mount_point != '':
+		if not mount_point:
+			result += '/usr/bin/dd if=/dev/zero of=' + mount_point + ' conv=fdatasync bs=4K count=10000\n'
+			result += __salt__['cmd.run']('/usr/bin/dd if=/dev/zero of=' + mount_point + ' bs=4K count=10000 conv=fdatasync' , output_loglevel='debug')
+			result += '\n'
+		else: 
 			result += '/usr/bin/dd if=/dev/zero of=' + mount_point + '/test conv=fdatasync bs=4K count=10000\n'
 			result += __salt__['cmd.run']('/usr/bin/dd if=/dev/zero of=' + mount_point + '/test bs=4K count=10000 conv=fdatasync' , output_loglevel='debug')
 			result += '\n'
 			__salt__['cmd.run']('/usr/bin/rm ' + mount_point + '/test' , output_loglevel='debug')
-		else: 
-			result += '/usr/bin/dd if=/dev/zero of=' + mount_point + ' conv=fdatasync bs=4K count=10000\n'
-			result += __salt__['cmd.run']('/usr/bin/dd if=/dev/zero of=' + mount_point + ' bs=4K count=10000 conv=fdatasync' , output_loglevel='debug')
-			result += '\n'
 	return result
 
 
