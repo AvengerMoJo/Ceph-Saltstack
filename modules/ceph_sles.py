@@ -30,14 +30,14 @@ import salt.modules.test as tool
 log.debug('Salt version : ' + str(tool.version()) )
 version = 2016 
 # run command as user who? older version user as root now as ceph
-ceph_user_as = 'ceph'
+ceph_user_as = 'cephadmin'
 if tool.version().startswith('2014'):
 	version = 2014
 	ceph_user_as = 'root'
 else:
 	version = 2015
 
-ceph_uid = pwd.getpwnam('ceph').pw_uid
+ceph_uid = pwd.getpwnam('cephadmin').pw_uid
 
 # take out cmd.shell hard code to make sure different version has the same result
 if version > 2014:
@@ -63,7 +63,7 @@ def _bench_prep():
 	'''
 	Prepare bench report gathering directory 
 	'''
-	bench_path = '/home/ceph/.ceph_sles_bench_report'
+	bench_path = '/home/cephadmin/.ceph_sles_bench_report'
 	if not os.path.exists( bench_path ):
 		mkdir_log = __salt__['cmd.run']('mkdir -p ' + bench_path, output_loglevel='debug', runas='ceph' )
 		return mkdir_log 
@@ -234,8 +234,8 @@ def _prep_activate_osd( node, part, journal=None ):
 	return output+prep+activate
 
 def _prep_activate_osd_old( node, part, journal ):
-	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
-	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
+	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 	return prep+activate
 
 def _remove_journal( osd_num ):
@@ -272,7 +272,7 @@ def keygen():
 	salt 'node1' ceph_sles.keygen
 	'''
 
-	out_log  = __salt__['cmd.run']('ssh-keygen -b 2048 -t rsa -f /home/ceph/.ssh/id_rsa -q -N ""', output_loglevel='debug', runas='ceph' )
+	out_log  = __salt__['cmd.run']('ssh-keygen -b 2048 -t rsa -f /home/cephadmin/.ssh/id_rsa -q -N ""', output_loglevel='debug', runas='ceph' )
 	# sshkey = salt_cmd.run('ssh-keygen', output_loglevel='debug', runas='ceph')
 	return out_log
 
@@ -312,7 +312,7 @@ def create_mon_node():
 	mon_map = 'monmap' 
 	mon_key_file = '/tmp/'+ mon_key
 	mon_map_file = '/tmp/'+ mon_map
-	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
 
 	output = __salt__['cmd.run']('mkdir -p ' + mon_dir, output_loglevel='debug', runas=ceph_user_as )
 	output += '\nRunning ceph-mon --mkfs -i ' + node + ' --monmap ' + mon_map_file + ' --keyring ' + mon_key_file 
@@ -336,7 +336,7 @@ def create_keys_all():
 	salt 'salt-master' ceph_sles.create_keys_all
 	'''
 	output = ''
-	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
         ceph_config_file = ceph_config_path + '/' + 'ceph.conf'
 	sm_cache_path = '/var/cache/salt/master/minions' 
 	sm_config = '/etc/salt/master' 
@@ -469,7 +469,7 @@ def new_ceph_cfg( *node_names ):
 	.. code-block:: bash
 	salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
 	'''
-	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
 	pillar_ceph_config_path = '/srv/pillar/ceph'
 	salt_ceph_config_path = '/srv/salt/ceph' 
 	mon_keyring_name = 'ceph.mon.keyring'
@@ -557,7 +557,7 @@ def new_mon( *node_names ):
 	.. code-block:: bash
 	salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
 	'''
-	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
 	mon_keyring_name = 'ceph.mon.keyring'
 	admin_keyring_name = 'ceph.client.admin.keyring'
 	monmap_name = 'monmap'
@@ -660,13 +660,13 @@ def new_mon_old( *node_names ):
 	for node in node_names :
 		node_list = node_list + node + ' '
 	
-	if not os.path.exists( '/home/ceph/.ceph_sles_cluster_config' ): 
-		mkdir_log  = __salt__['cmd.run']('mkdir -p /home/ceph/.ceph_sles_cluster_config', output_loglevel='debug', runas='ceph' )
+	if not os.path.exists( '/home/cephadmin/.ceph_sles_cluster_config' ): 
+		mkdir_log  = __salt__['cmd.run']('mkdir -p /home/cephadmin/.ceph_sles_cluster_config', output_loglevel='debug', runas='ceph' )
 
-	if not salt_utils.istextfile( '/home/ceph/.ceph_sles_cluster_config/ceph.conf' ):
-		deploy_new_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	if not salt_utils.istextfile( '/home/cephadmin/.ceph_sles_cluster_config/ceph.conf' ):
+		deploy_new_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 
-	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 	return mkdir_log + deploy_new_log + out_log
 
 def purge_mon():
@@ -697,7 +697,7 @@ def push_conf( *node_names ):
 	.. code-block:: bash
 	salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
 	'''
-	c_conf_dir ='/home/ceph/.ceph_sles_cluster_config/' 
+	c_conf_dir ='/home/cephadmin/.ceph_sles_cluster_config/' 
 	client_key ='ceph.client.admin.keyring'
 	rgw_key ='ceph.client.radosgw.keyring'
 	node_list = ''
@@ -921,7 +921,7 @@ def bench_test_ruleset( replication_size=3 ):
 	.. code-block:: bash
 	salt 'node*' ceph_sles.bench_test_ruleset 2 
 	'''
-	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
 	new_bin_map = 'new_crushmap.bin'
 	utilization = __salt__['cmd.run']('crushtool --test -i ' + new_bin_map + ' --show-utilization --num-rep=' + str(replication_size),
 	output_loglevel='debug', runas='ceph', cwd=crushmap_path )
@@ -941,7 +941,7 @@ def bench_rados():
 	salt 'salt-master' ceph_sles.bench_rados
 	'''
 	rbd_fio_name ='fio_test'
-	bench_path = '/home/ceph/.ceph_sles_bench_report'
+	bench_path = '/home/cephadmin/.ceph_sles_bench_report'
 	pool_names = ['ssd','hdd']
 	thread_counts = [1, 4, 16]
 	bench_time = 100	
@@ -1039,7 +1039,7 @@ def bench_fio():
 	salt 'salt-master' ceph_sles.bench_fio
 	'''
 	rbd_fio_name ='fio_test'
-	bench_path = '/home/ceph/.ceph_sles_bench_report'
+	bench_path = '/home/cephadmin/.ceph_sles_bench_report'
 	pool_names = ['ssd','hdd','mix']
 	bench_time = 100	
 	
@@ -1134,7 +1134,7 @@ def clean_disk_partition_old( nodelist=None, partlist=None):
 		# if __salt__['file.is_blkdev'](dev):
 		for part in part_list:
 			disk_zap += __salt__['cmd.run']('ceph-deploy disk zap ' + node +
-			 ':' + part , output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+			 ':' + part , output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 	return disk_zap
 
 def create_pool( pool_name, pg_num, replication_size, ruleset_name='replicated_ruleset', pool_type='replicated' ):
@@ -1153,7 +1153,7 @@ def create_pool( pool_name, pg_num, replication_size, ruleset_name='replicated_r
 	output_loglevel='debug', cwd='/etc/ceph' )
 
 	# create_pool = __salt__['cmd.run']('ceph osd pool set ' + pool_name + ' rulsset ' + ruleset_num,
-	# output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	# output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 
 	return create_pool
 	
@@ -1321,7 +1321,7 @@ def remove_osd( *osd_num ):
 	salt 'node1' ceph_sles.remove_osd 0 1 2 3 
 
 	'''
-	ceph_conf = '/home/ceph/.ceph_sles_cluster_config'
+	ceph_conf = '/home/cephadmin/.ceph_sles_cluster_config'
 	admin_key = 'ceph.client.admin.keyring'
 	remove = "" 
 	for osd in osd_num:
@@ -1342,7 +1342,7 @@ def remove_pool( pool_name ):
 	salt 'node1' ceph_sles.remove_pool pool_name
 	'''
 	return  __salt__['cmd.run']('ceph osd pool delete ' + pool_name + ' ' + pool_name + '  --yes-i-really-really-mean-it ', 
-	output_loglevel='debug', runas='ceph', cwd='/home/ceph/.ceph_sles_cluster_config' )
+	output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 
 def profile_node():
 	'''
@@ -1486,7 +1486,7 @@ def _prepare_crushmap():
 	'''
 	Create a directory for hold current crushmap configuration and modify later
 	'''
-	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
 	orig_bin_map = 'orig_crushmap.bin'
 	orig_txt_map = 'orig_crushmap.txt'
 	new_txt_map = 'new_crushmap.txt'
@@ -1505,7 +1505,7 @@ def _read_crushmap_begin_section( begin_line, end_line ):
 	Read the new_crushmap.txt and get the first section 
 	from line e.g. "# begin crush map" to "# devices"
 	'''
-	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
 	new_txt_map = 'new_crushmap.txt'
 	output = ""
 	in_section = False
@@ -1558,7 +1558,7 @@ def _update_crushmap():
 	'''
 	Compile and install the new crushmap into the cluster 
 	'''
-	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
 	new_txt_map = 'new_crushmap.txt'
 	new_bin_map = 'new_crushmap.bin'
 
@@ -1630,7 +1630,7 @@ def _read_ruleset_next_id( all_ruleset ):
 def crushmap_update_disktype_ssd_hdd( *node_names ):
 	'''
 	Run the command from master-admin node
-	1) Prepare crushmap in /home/ceph/.ceph_sles_cluster_config/crushmap
+	1) Prepare crushmap in /home/cephadmin/.ceph_sles_cluster_config/crushmap
 	2) Add disktype to default crushmap
 	3) Find all node ssd and hdd and group them into root_sdd and root_hdd 
 
@@ -1640,7 +1640,7 @@ def crushmap_update_disktype_ssd_hdd( *node_names ):
 	salt 'salt-master' ceph_sles.crushmap_update_disktype_ssd_hdd node1 node2 node3 
 
 	'''
-	crushmap_path = '/home/ceph/.ceph_sles_cluster_config/crushmap'
+	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
 	new_txt_map = 'new_crushmap.txt'
 
 	begin_line = '# begin crush map'
@@ -1739,7 +1739,7 @@ def _radosgw_keygen( gateway_node ):
 	.. code-block:: bash
 	salt 'salt-master' ceph_sles.radosgw_key
 	'''
-	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
 	radosgw_keyring  = 'ceph.client.radosgw.keyring'
 
 	keygen = __salt__['cmd.run']('ceph-authtool -C -n client.radosgw.'+ gateway_node + ' --gen-key ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas='ceph') +'\n'
@@ -1779,7 +1779,7 @@ def _rewrite_conf_gateway( gateway_node ):
 	'''
 	Read the ceph.conf and take out the radosgw configuration if exist
 	'''
-	ceph_config_path = '/home/ceph/.ceph_sles_cluster_config'
+	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
 	ceph_conf = 'ceph.conf'
 	old_conf = ""
 	take_out = False
