@@ -65,7 +65,7 @@ def _bench_prep():
 	'''
 	bench_path = '/home/cephadmin/.ceph_sles_bench_report'
 	if not os.path.exists( bench_path ):
-		mkdir_log = __salt__['cmd.run']('mkdir -p ' + bench_path, output_loglevel='debug', runas='ceph' )
+		mkdir_log = __salt__['cmd.run']('mkdir -p ' + bench_path, output_loglevel='debug', runas=ceph_user_as )
 		return mkdir_log 
 	else:
 		return True
@@ -234,8 +234,8 @@ def _prep_activate_osd( node, part, journal=None ):
 	return output+prep+activate
 
 def _prep_activate_osd_old( node, part, journal ):
-	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
-	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
+	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas=ceph_user_as, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
+	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas=ceph_user_as, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 	return prep+activate
 
 def _remove_journal( osd_num ):
@@ -272,8 +272,8 @@ def keygen():
 	salt 'node1' ceph_sles.keygen
 	'''
 
-	out_log  = __salt__['cmd.run']('ssh-keygen -b 2048 -t rsa -f /home/cephadmin/.ssh/id_rsa -q -N ""', output_loglevel='debug', runas='ceph' )
-	# sshkey = salt_cmd.run('ssh-keygen', output_loglevel='debug', runas='ceph')
+	out_log  = __salt__['cmd.run']('ssh-keygen -b 2048 -t rsa -f /home/cephadmin/.ssh/id_rsa -q -N ""', output_loglevel='debug', runas=ceph_user_as )
+	# sshkey = salt_cmd.run('ssh-keygen', output_loglevel='debug', runas=ceph_user_as)
 	return out_log
 
 
@@ -290,11 +290,11 @@ def send_key( *node_names ):
         '''
 	out_log = []
 	for node in node_names :
-		out_log.append( __salt__['cmd.run']('ssh-keygen -R '+ socket.gethostbyname(node), output_loglevel='debug', runas='ceph' ))
-		out_log.append( __salt__['cmd.run']('ssh-keygen -R '+ node, output_loglevel='debug', runas='ceph' ))
-		out_log.append( __salt__['cmd.run']('ssh-keyscan '+ node +' >> ~/.ssh/known_hosts'  , output_loglevel='debug', runas='ceph' ))
+		out_log.append( __salt__['cmd.run']('ssh-keygen -R '+ socket.gethostbyname(node), output_loglevel='debug', runas=ceph_user_as ))
+		out_log.append( __salt__['cmd.run']('ssh-keygen -R '+ node, output_loglevel='debug', runas=ceph_user_as ))
+		out_log.append( __salt__['cmd.run']('ssh-keyscan '+ node +' >> ~/.ssh/known_hosts'  , output_loglevel='debug', runas=ceph_user_as ))
 		# assume the kiwi image predefine user ceph with password suse1234
-		out_log.append( __salt__['cmd.run']('sshpass -p "suse1234" ssh-copy-id ceph@'+node , output_loglevel='debug', runas='ceph' ))
+		out_log.append( __salt__['cmd.run']('sshpass -p "suse1234" ssh-copy-id ceph@'+node , output_loglevel='debug', runas=ceph_user_as ))
 	return out_log
 
 def create_mon_node():
@@ -477,14 +477,14 @@ def new_ceph_cfg( *node_names ):
 	monmap_name = 'monmap'
 	output = 'Creating default config file with node names - '
 	if not os.path.exists( ceph_config_path ):
-		output += __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
+		output += __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas=ceph_user_as )
 	if not os.path.exists( pillar_ceph_config_path ):
 		output += __salt__['cmd.run']( 'mkdir -p '+pillar_ceph_config_path, output_loglevel='debug' )
 	if not os.path.exists( salt_ceph_config_path ):
 		output += __salt__['cmd.run']( 'mkdir -p '+salt_ceph_config_path, output_loglevel='debug' )
 
 	global_config = "[global]"
-	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas='ceph' )
+	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas=ceph_user_as )
 	uuid_config = "fsid = " + uuid
 	mon_initial_member_config = "mon_initial_members = "
 	mon_host_config = "mon_host = " 
@@ -563,10 +563,10 @@ def new_mon( *node_names ):
 	monmap_name = 'monmap'
 	output = ''
 	if not os.path.exists( ceph_config_path ):
-		mkdir_log  = __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas='ceph' )
+		mkdir_log  = __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas=ceph_user_as )
 
 	global_config = "[global]"
-	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas='ceph' )
+	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas=ceph_user_as )
 	uuid_config = "fsid = " + uuid
 	mon_initial_member_config = "mon_initial_members = "
 	mon_host_config = "mon_host = " 
@@ -608,17 +608,17 @@ def new_mon( *node_names ):
 	monmap_filename = '/tmp/' + monmap_name
 	
 	output += "Create mon key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + mon_key_filename + \
-	' --gen-key -n mon. --cap mon "allow *"', output_loglevel='debug', runas='ceph' ) + '\n'
+	' --gen-key -n mon. --cap mon "allow *"', output_loglevel='debug', runas=ceph_user_as ) + '\n'
 	output += "Create admin key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + admin_key_filename + \
 	' --gen-key -n client.admin --set-uid=0 --cap mon "allow *" --cap osd "allow *" --cap mds "allow *"',\
-	 output_loglevel='debug', runas='ceph' ) + '\n'
+	 output_loglevel='debug', runas=ceph_user_as ) + '\n'
 
 
 	join_keyring = __salt__['cmd.run']('ceph-authtool ' + mon_key_filename + ' --import-keyring ' +\
- 	admin_key_filename, output_loglevel='debug', runas='ceph' )
+ 	admin_key_filename, output_loglevel='debug', runas=ceph_user_as )
 
 	output += "Monmaptool create :\n" + __salt__['cmd.run']('monmaptool --create ' + monmap_list + ' --fsid ' + uuid + \
-	' --clobber ' + monmap_filename, output_loglevel='debug', runas='ceph' ) + '\n'
+	' --clobber ' + monmap_filename, output_loglevel='debug', runas=ceph_user_as ) + '\n'
 
 	if len(node_names) > 1:
 		for node in node_names:
@@ -661,12 +661,12 @@ def new_mon_old( *node_names ):
 		node_list = node_list + node + ' '
 	
 	if not os.path.exists( '/home/cephadmin/.ceph_sles_cluster_config' ): 
-		mkdir_log  = __salt__['cmd.run']('mkdir -p /home/cephadmin/.ceph_sles_cluster_config', output_loglevel='debug', runas='ceph' )
+		mkdir_log  = __salt__['cmd.run']('mkdir -p /home/cephadmin/.ceph_sles_cluster_config', output_loglevel='debug', runas=ceph_user_as )
 
 	if not salt_utils.istextfile( '/home/cephadmin/.ceph_sles_cluster_config/ceph.conf' ):
-		deploy_new_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
+		deploy_new_log  = __salt__['cmd.run']('ceph-deploy new '+ node_list  , output_loglevel='debug', runas=ceph_user_as, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 
-	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
+	out_log  = __salt__['cmd.run']('ceph-deploy --overwrite-conf mon create-initial' , output_loglevel='debug', runas=ceph_user_as, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 	return mkdir_log + deploy_new_log + out_log
 
 def purge_mon():
@@ -815,12 +815,12 @@ def iperf( cpu_num, port_num, server ):
 	outpath = '/tmp/iperf/'
 
 	if not os.path.exists( outpath ):
-		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + outpath, output_loglevel='debug', runas='ceph' )
+		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + outpath, output_loglevel='debug', runas=ceph_user_as )
 
 	outfile = outpath + server + '.c' + str(cpu_num) + '.' + str(port_num) + '.iperf.dat'
 	ceph_info_out = open( outfile,  "w" )
 
-	iperf_log = __salt__['cmd.run']('/usr/bin/iperf3 -f M -t 100 -A ' + str(cpu_num) + ' -c ' + server + ' -p ' + str(port_num) , output_loglevel='debug', runas='ceph')
+	iperf_log = __salt__['cmd.run']('/usr/bin/iperf3 -f M -t 100 -A ' + str(cpu_num) + ' -c ' + server + ' -p ' + str(port_num) , output_loglevel='debug', runas=ceph_user_as)
 
 	ceph_info_out.write( iperf_log )
 	ceph_info_out.close()
@@ -924,7 +924,7 @@ def bench_test_ruleset( replication_size=3 ):
 	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
 	new_bin_map = 'new_crushmap.bin'
 	utilization = __salt__['cmd.run']('crushtool --test -i ' + new_bin_map + ' --show-utilization --num-rep=' + str(replication_size),
-	output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	output_loglevel='debug', runas=ceph_user_as, cwd=crushmap_path )
 
 	return utilization
 
@@ -1134,7 +1134,7 @@ def clean_disk_partition_old( nodelist=None, partlist=None):
 		# if __salt__['file.is_blkdev'](dev):
 		for part in part_list:
 			disk_zap += __salt__['cmd.run']('ceph-deploy disk zap ' + node +
-			 ':' + part , output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
+			 ':' + part , output_loglevel='debug', runas=ceph_user_as, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 	return disk_zap
 
 def create_pool( pool_name, pg_num, replication_size, ruleset_name='replicated_ruleset', pool_type='replicated' ):
@@ -1153,7 +1153,7 @@ def create_pool( pool_name, pg_num, replication_size, ruleset_name='replicated_r
 	output_loglevel='debug', cwd='/etc/ceph' )
 
 	# create_pool = __salt__['cmd.run']('ceph osd pool set ' + pool_name + ' rulsset ' + ruleset_num,
-	# output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
+	# output_loglevel='debug', runas=ceph_user_as, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 
 	return create_pool
 	
@@ -1325,10 +1325,10 @@ def remove_osd( *osd_num ):
 	admin_key = 'ceph.client.admin.keyring'
 	remove = "" 
 	for osd in osd_num:
-		remove += __salt__['cmd.run']('ceph osd down osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas='ceph', cwd=ceph_conf ) + '\n'
-		remove += __salt__['cmd.run']('ceph osd crush remove osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas='ceph', cwd=ceph_conf ) + '\n'
-		remove += __salt__['cmd.run']('ceph auth del osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas='ceph', cwd=ceph_conf ) + '\n'
-		remove += __salt__['cmd.run']('ceph osd rm '+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas='ceph', cwd=ceph_conf ) + '\n'
+		remove += __salt__['cmd.run']('ceph osd down osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user_as, cwd=ceph_conf ) + '\n'
+		remove += __salt__['cmd.run']('ceph osd crush remove osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user_as, cwd=ceph_conf ) + '\n'
+		remove += __salt__['cmd.run']('ceph auth del osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user_as, cwd=ceph_conf ) + '\n'
+		remove += __salt__['cmd.run']('ceph osd rm '+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user_as, cwd=ceph_conf ) + '\n'
 
 	return remove
 
@@ -1342,7 +1342,7 @@ def remove_pool( pool_name ):
 	salt 'node1' ceph_sles.remove_pool pool_name
 	'''
 	return  __salt__['cmd.run']('ceph osd pool delete ' + pool_name + ' ' + pool_name + '  --yes-i-really-really-mean-it ', 
-	output_loglevel='debug', runas='ceph', cwd='/home/cephadmin/.ceph_sles_cluster_config' )
+	output_loglevel='debug', runas=ceph_user_as, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 
 def profile_node():
 	'''
@@ -1383,7 +1383,7 @@ def _crushmap_root_disktype_output( disk_type, next_id, osd_weight_total ):
 	return output
 
 def _osd_tree_obj():
-	tree_view_json =  __salt__[shell_cmd]('ceph osd tree --format json 2> /dev/null | grep {', output_loglevel='debug', cwd='/etc/ceph', runas='ceph' )
+	tree_view_json =  __salt__[shell_cmd]('ceph osd tree --format json 2> /dev/null | grep {', output_loglevel='debug', cwd='/etc/ceph', runas=ceph_user_as )
 	tree_view = json.loads( tree_view_json )
 	return tree_view
 
@@ -1492,11 +1492,11 @@ def _prepare_crushmap():
 	new_txt_map = 'new_crushmap.txt'
 
 	if not os.path.exists( crushmap_path ):
-		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + crushmap_path, output_loglevel='debug', runas='ceph' )
+		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + crushmap_path, output_loglevel='debug', runas=ceph_user_as )
 
-	prep = "get crushmap:\n" + __salt__['cmd.run']('ceph osd getcrushmap -o ' + orig_bin_map, output_loglevel='debug', runas='ceph', cwd=crushmap_path )
-	prep += "create text crushmap:\n" + __salt__['cmd.run']('crushtool -d ' + orig_bin_map + ' -o ' + orig_txt_map , output_loglevel='debug', runas='ceph', cwd=crushmap_path )
-	prep += "create new_crushmap.txt:\n" +  __salt__['cmd.run']('cp ' + orig_txt_map + ' ' + new_txt_map  , output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	prep = "get crushmap:\n" + __salt__['cmd.run']('ceph osd getcrushmap -o ' + orig_bin_map, output_loglevel='debug', runas=ceph_user_as, cwd=crushmap_path )
+	prep += "create text crushmap:\n" + __salt__['cmd.run']('crushtool -d ' + orig_bin_map + ' -o ' + orig_txt_map , output_loglevel='debug', runas=ceph_user_as, cwd=crushmap_path )
+	prep += "create new_crushmap.txt:\n" +  __salt__['cmd.run']('cp ' + orig_txt_map + ' ' + new_txt_map  , output_loglevel='debug', runas=ceph_user_as, cwd=crushmap_path )
 
 	return prep
 
@@ -1562,8 +1562,8 @@ def _update_crushmap():
 	new_txt_map = 'new_crushmap.txt'
 	new_bin_map = 'new_crushmap.bin'
 
-	prep = __salt__['cmd.run']('crushtool -c ' + new_txt_map + ' -o ' + new_bin_map, output_loglevel='debug', runas='ceph', cwd=crushmap_path )
-	prep += __salt__['cmd.run']('ceph osd setcrushmap -i ' + new_bin_map, output_loglevel='debug', runas='ceph', cwd=crushmap_path )
+	prep = __salt__['cmd.run']('crushtool -c ' + new_txt_map + ' -o ' + new_bin_map, output_loglevel='debug', runas=ceph_user_as, cwd=crushmap_path )
+	prep += __salt__['cmd.run']('ceph osd setcrushmap -i ' + new_bin_map, output_loglevel='debug', runas=ceph_user_as, cwd=crushmap_path )
 
 	return prep
 
@@ -1742,9 +1742,9 @@ def _radosgw_keygen( gateway_node ):
 	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
 	radosgw_keyring  = 'ceph.client.radosgw.keyring'
 
-	keygen = __salt__['cmd.run']('ceph-authtool -C -n client.radosgw.'+ gateway_node + ' --gen-key ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas='ceph') +'\n'
-	keygen += __salt__['cmd.run']('ceph-authtool -n client.radosgw.' + gateway_node + ' --cap osd "allow rwx" --cap mon "allow rwx"  ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas='ceph') +'\n'
-	keygen += __salt__['cmd.run']('ceph auth add client.radosgw.' + gateway_node + ' --in-file ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas='ceph') +'\n'
+	keygen = __salt__['cmd.run']('ceph-authtool -C -n client.radosgw.'+ gateway_node + ' --gen-key ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas=ceph_user_as) +'\n'
+	keygen += __salt__['cmd.run']('ceph-authtool -n client.radosgw.' + gateway_node + ' --cap osd "allow rwx" --cap mon "allow rwx"  ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas=ceph_user_as) +'\n'
+	keygen += __salt__['cmd.run']('ceph auth add client.radosgw.' + gateway_node + ' --in-file ' + ceph_config_path + '/' + radosgw_keyring , output_loglevel='debug', runas=ceph_user_as) +'\n'
 	return keygen
 
 def _radosgw_config_update( gateway_node ):
@@ -1896,7 +1896,7 @@ def new_mds():
 	mds_node_path = '/var/lib/ceph/mds/ceph-' + node + '/'
 
 	if not os.path.exists( mds_node_path ):
-		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + mds_node_path, output_loglevel='debug', runas='ceph' )
+		mkdir_log  = __salt__['cmd.run']('mkdir -p ' + mds_node_path, output_loglevel='debug', runas=ceph_user_as )
 
 	out = __salt__['cmd.run']('/usr/bin/ceph --cluster ceph --name client.admin auth get-or-create mds.' + node + \
 	' osd "allow rwx" mds "allow *" mon "allow profile mds" -o /var/lib/ceph/mds/ceph-' + node + '/keyring',
