@@ -1,6 +1,9 @@
 install_lttng:
   pkg.installed:
-    - name: lttng-modules lttng-tools lttng-ust 
+    - pkgs:
+      - lttng-modules
+      - lttng-tools
+      - lttng-ust 
 
 
 /usr/lib/systemd/system/lttng.service:
