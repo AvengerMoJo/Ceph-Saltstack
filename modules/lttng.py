@@ -117,16 +117,17 @@ def run(cmd):
     lttng_log += __salt__[shell]('lttng enable-channel --num-subbuf 16 \
                                  --subbuf-size 8M -k c0',
                                  cwd=lttng_output_path)
-    lttng_log += __salt__[shell]('lttng enable-event ' + lttng_kernel_switch_string +
+    lttng_log += __salt__[shell]('lttng enable-event ' +
+                                 lttng_kernel_switch_string +
                                  ' -k -c c0', cwd=lttng_output_path)
     lttng_log += __salt__['cmd.run']('lttng enable-event --syscall -a -k -c c0',
                                      cwd=lttng_output_path)
     lttng_log += __salt__['cmd.run']('lttng start', cwd=lttng_output_path)
-    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
-    proc.wait()
+    p = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    p.wait()
     lttng_log += __salt__['cmd.run']('lttng stop', cwd=lttng_output_path)
     lttng_log += __salt__['cmd.run']('lttng destroy', cwd=lttng_output_path)
-    return node, report_path, proc.returncode, proc.stdout.read(), proc.stderr.read()
+    return node, report_path, p.returncode, p.stdout.read(), p.stderr.read()
 
 
 run.__doc__ %= lttng_kernel_switch_string
@@ -150,6 +151,62 @@ def collect_file(report_name):
     '''
     Sending report back to salt-master file repo
     '''
-    send_log = __salt__['cp.push_dir']('/var/run/lttng/output/' + report_name)
-    return send_log
+    node = socket.gethostname()
+    send_log = __salt__['cp.push_dir']('/var/run/lttng/output/' + report_name,
+                                       upload_path='/'+node+'/')
+    return node, send_log
 
+
+def prepare():
+    '''
+    CLI Example:
+        .. code-block:: bash
+        sudo salt 'node' lttng.prepare
+
+    lttng start and run cmd and the capture result for reporting as following:
+
+    lttng create -o .
+    lttng enable-channel --num-subbuf 16 --subbuf-size 8M -k c0
+    lttng enable-event %s -k -c c0
+    lttng enable-event --syscall -a -k -c c0
+    lttng start
+
+    '''
+    date_now = datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
+    node = socket.gethostname()
+    report_path = node + '-' + date_now
+
+    if not os.path.exists(lttng_output_path):
+        mkdir = Popen(['/usr/bin/mkdir', '-p', lttng_output_path])
+        mkdir.wait()
+
+    lttng_log = __salt__[shell]('lttng create -o ' + report_path,
+                                cwd=lttng_output_path)
+    lttng_log += __salt__[shell]('lttng enable-channel --num-subbuf 16 \
+                                 --subbuf-size 8M -k c0',
+                                 cwd=lttng_output_path)
+    lttng_log += __salt__[shell]('lttng enable-event ' +
+                                 lttng_kernel_switch_string +
+                                 ' -k -c c0', cwd=lttng_output_path)
+    lttng_log += __salt__[shell]('lttng enable-event --syscall -a -k -c c0',
+                                 cwd=lttng_output_path)
+    lttng_log += __salt__[shell]('lttng start', cwd=lttng_output_path)
+
+    return report_path
+
+
+prepare.__doc__ %= lttng_kernel_switch_string
+
+
+def finish():
+    '''
+    CLI Example:
+        .. code-block:: bash
+        sudo salt 'node' lttng.finish()
+
+    lttng stop
+    lttng destroy
+    '''
+    lttng_log = __salt__[shell]('lttng stop', cwd=lttng_output_path)
+    lttng_log += __salt__[shell]('lttng destroy', cwd=lttng_output_path)
+    return "lttng stop and destroy"
