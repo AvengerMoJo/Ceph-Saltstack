@@ -3,9 +3,9 @@
 import logging
 # import os
 import re
-# import shutil
+import socket
 from netaddr import IPNetwork, IPAddress
-from subprocess import PIPE, Popen
+# from subprocess import PIPE, Popen
 
 import salt.client
 
@@ -15,7 +15,7 @@ lttng runner to conduct all the lttng in different nodes
 log = logging.getLogger(__name__)
 
 
-def run(cluster=None, exclude=None, cmd=None, **kwargs):
+def run(cluster=None, exclude=None, cmd=None, cmd_server=None, **kwargs):
     '''
     lttng tracing the cluster networkj
     CLI Example: (Before DeepSea with a cluster configuration)
@@ -52,11 +52,16 @@ def run(cluster=None, exclude=None, cmd=None, **kwargs):
         log.debug("lttng.run: start {}".format(cluster_addresses))
         reports = _start(cluster_addresses)
         log.debug("lttng.run: report {}".format(reports))
-        p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-        p.wait()
+        # p = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
+        # p.wait()
+        if not cmd_server:
+            cmd_server = socket.gethostname()
+        local = salt.client.LocalClient()
+        p = local.cmd("E@" + cmd_server, 'lttng.do_run', cmd,
+                      expr_form="compound")
         reports = _finish(cluster_addresses, reports)
         log.debug("lttng.run: report_final {}".format(reports))
-        return p.returncode, p.stdout.read(), p.stderr.read()
+        return p
 
 
 def _exclude_filter(excluded):

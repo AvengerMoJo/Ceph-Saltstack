@@ -140,11 +140,18 @@ def clean_output():
         .. code-block:: bash
         sudo salt 'node' lttng.clean_output
     '''
+    cmd = ['/usr/bin/lttng', 'destroy', '-a']
+    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    proc.wait()
+    log = 'lttng destroy: {}\n{}\n{}'.format(cmd, proc.stdout.read(),
+                                             proc.stderr.read())
     cmd = ['/usr/bin/rm', '-rf', lttng_output_path]
     proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
     proc.wait()
-    return 'Clean up directory: {}\n{}\n{}'.format(cmd, proc.stdout.read(),
-                                                   proc.stderr.read())
+    log += '\n' + 'Clean up directory: {}\n{}\n{}'.format(cmd,
+                                                          proc.stdout.read(),
+                                                          proc.stderr.read())
+    return log
 
 
 def collect_file(report_name):
@@ -202,7 +209,7 @@ def finish():
     '''
     CLI Example:
         .. code-block:: bash
-        sudo salt 'node' lttng.finish()
+        sudo salt 'node' lttng.finish
 
     lttng stop
     lttng destroy
@@ -210,3 +217,15 @@ def finish():
     lttng_log = __salt__[shell]('lttng stop', cwd=lttng_output_path)
     lttng_log += __salt__[shell]('lttng destroy', cwd=lttng_output_path)
     return "lttng stop and destroy"
+
+
+def do_run(cmd):
+    '''
+    CLI Example:
+        .. code-block:: bash
+        sudo salt 'node' lttng.do_run "[cmd, parm1, parm2....]"
+
+    '''
+    p = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
+    p.wait()
+    return p.returncode, p.stdout.read(), p.stderr.read()
