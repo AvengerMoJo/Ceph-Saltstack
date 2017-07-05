@@ -4,6 +4,7 @@ import logging
 # import os
 import re
 import socket
+import time
 from netaddr import IPNetwork, IPAddress
 # from subprocess import PIPE, Popen
 
@@ -20,10 +21,12 @@ def run(cluster=None, exclude=None, cmd=None, cmd_server=None, **kwargs):
     lttng tracing the cluster networkj
     CLI Example: (Before DeepSea with a cluster configuration)
     .. code-block:: bash
-        sudo salt-run lttng_trace.run
+        sudo salt-run lttng_trace.run cluster=ceph exclude=10.0.0.2
+        cmd='/full/path' cmd_server=minion_node
     or we can test it with a cluster
     '''
-
+    cluster_addresses = []
+    cluster_networks = []
     exclude_string = exclude_iplist = None
     if exclude:
         exclude_string, exclude_iplist = _exclude_filter(exclude)
@@ -41,7 +44,6 @@ def run(cluster=None, exclude=None, cmd=None, cmd_server=None, **kwargs):
         total = local.cmd(search, 'grains.get', ['ipv4'], expr_form="compound")
         log.debug("lttng.run: total grains.get {} ".format(total))
 
-        cluster_addresses = []
         for host in sorted(total.iterkeys()):
             if 'cluster_network' in cluster_networks[host]:
                 cluster_addresses.extend(
@@ -52,16 +54,45 @@ def run(cluster=None, exclude=None, cmd=None, cmd_server=None, **kwargs):
         log.debug("lttng.run: start {}".format(cluster_addresses))
         reports = _start(cluster_addresses)
         log.debug("lttng.run: report {}".format(reports))
-        # p = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
-        # p.wait()
-        if not cmd_server:
-            cmd_server = socket.gethostname()
-        local = salt.client.LocalClient()
-        p = local.cmd("E@" + cmd_server, 'lttng.do_run', cmd,
-                      expr_form="compound")
-        reports = _finish(cluster_addresses, reports)
-        log.debug("lttng.run: report_final {}".format(reports))
-        return p
+
+    else:
+        search = "*"
+        if exclude_string:
+            search += " and not ( " + exclude_string + " )"
+            log.debug("lttng.run: search {} ".format(search))
+        cluster_networks = local.cmd(search,
+                                     'grains.get',
+                                     ['ipv4'],
+                                     expr_form="compound")
+        log.debug("lttng.run: total grains.get {} ".format(cluster_networks))
+
+        for host in sorted(cluster_networks.iterkeys()):
+            log.debug("lttng.run: hostname minid{}".format(
+                cluster_networks[host]))
+            try:
+                cluster_networks[host].remove('127.0.0.1')
+            except ValueError:
+                log.debug("lttng.run remove local interface fail")
+                pass
+            cluster_addresses.extend(cluster_networks[host])
+            log.debug("lttng.run: cluster_network {}".format(cluster_addresses))
+
+        log.debug("lttng.run: start {}".format(cluster_addresses))
+        reports = _start(cluster_addresses)
+        log.debug("lttng.run: report {}".format(reports))
+
+    if not cmd_server:
+        cmd_server = socket.gethostname()
+    local = salt.client.LocalClient()
+    log.debug("lttng.run cmd = {}".format(cmd))
+    p = local.cmd("E@" + cmd_server, 'lttng.do_run', cmd, expr_form="compound")
+
+    time.sleep(20)
+
+    log.debug("lttng.run: cluster {}".format(cluster_addresses))
+    reports = _finish(cluster_addresses, reports)
+    log.debug("lttng.run: report_final {}".format(reports))
+    return p
 
 
 def _exclude_filter(excluded):
