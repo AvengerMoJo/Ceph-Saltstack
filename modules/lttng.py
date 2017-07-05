@@ -80,7 +80,7 @@ lttng_kernel_switch = ["sched_switch",
                        "x86_irq_vectors_ipi_exit",
                        "inet_sock_local_in",
                        "inet_sock_local_out",
-                       "lttng_statedump_interrupt"
+                       "lttng_statedump_interrupt",
                        # Events for synchronization
                        "net_if_receive_skb",
                        "net_dev_queue"]
