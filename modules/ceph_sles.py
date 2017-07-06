@@ -160,418 +160,494 @@ def _disk_format_xfs(dev_part):
     '''
     format partition to xfs format
     '''
-    format_part = __salt__['cmd.run']('/usr/sbin/mkfs.xfs -f ' + dev_part, output_loglevel='debug')
+    format_part = __salt__['cmd.run']('/usr/sbin/mkfs.xfs -f ' + dev_part,
+                                      output_loglevel='debug')
     return format_part
 
-def _fstab_remove_part( part ):
-	'''
-	remove partition mount point from fstab
-	'''
-	cp_fstab= __salt__[shell_cmd]('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug' )
-	remove_part = __salt__[shell_cmd]('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab', output_loglevel='debug' )
 
-def _fstab_add_part( part, path ):
-	'''
-	put in the new partition and mount point into fstab
-	'''
-	_fstab_remove_part( part )
-	add_part = __salt__[shell_cmd]('echo "/dev/disk/by-id/' + part + ' ' + path +
-	' xfs	rw,defaults,noexec,nodev,noatime,nodiratime,nobarrier 0 0  ">> /etc/fstab', output_loglevel='debug' )
+def _fstab_remove_part(part):
+    '''
+    remove partition mount point from fstab
+    '''
+    __salt__[shell_cmd]('cp /etc/fstab /etc/fstab.bak', output_loglevel='debug')
+    __salt__[shell_cmd]('grep -v ' + part + ' /etc/fstab.bak > /etc/fstab',
+                        output_loglevel='debug')
+
+
+def _fstab_add_part(part, path):
+    '''
+    put in the new partition and mount point into fstab
+    '''
+    _fstab_remove_part(part)
+    __salt__[shell_cmd]('echo "/dev/disk/by-id/' + part + ' ' + path +
+                        ' xfs	rw,defaults,noexec,nodev,noatime,' +
+                        'nodiratime,nobarrier 0 0  ">> /etc/fstab',
+                        output_loglevel='debug')
+
 
 def _ip_info():
-	'''
-	ip -d addr  Profile record for the cluster information
-	'''
-	info = __salt__['cmd.run']('ip -d link', output_loglevel='debug' )
-	info += __salt__['cmd.run']('ip -d addr', output_loglevel='debug' )
-	return "\nip -d a & ip -d l:\n" + info
+    '''
+    ip -d addr  Profile record for the cluster information
+    '''
+    info = __salt__['cmd.run']('ip -d link', output_loglevel='debug')
+    info += __salt__['cmd.run']('ip -d addr', output_loglevel='debug')
+    return "\nip -d a & ip -d l:\n" + info
+
 
 def _list_osd_files():
-	'''
-	return line seperated list of osd directory in /var/lib/ceph/osd
-	'''
-	osd_path = '/var/lib/ceph/osd/'
-	possible_osd = __salt__[shell_cmd]('ls '+ osd_path + ' | grep ceph' , output_loglevel='debug')
-	return possible_osd
+    '''
+    return line seperated list of osd directory in /var/lib/ceph/osd
+    '''
+    osd_path = '/var/lib/ceph/osd/'
+    possible_osd = __salt__[shell_cmd]('ls ' + osd_path + ' | grep ceph',
+                                       output_loglevel='debug')
+    return possible_osd
+
 
 def _lsblk_list_all():
-	'''
-	lsblk -a -O Profile record for the cluster information
-	'''
-	info = __salt__['cmd.run']('lsblk -a -O', output_loglevel='debug' )
-	return "\nlsblk -a -O:\n" + info
+    '''
+    lsblk -a -O Profile record for the cluster information
+    '''
+    info = __salt__['cmd.run']('lsblk -a -O', output_loglevel='debug')
+    return "\nlsblk -a -O:\n" + info
+
 
 def _lspci():
-	'''
-	lspci Profile record for the cluster information
-	'''
-	info = __salt__['cmd.run']('lspci ', output_loglevel='debug' )
-	return "\nlspci:\n" + info
+    '''
+    lspci Profile record for the cluster information
+    '''
+    info = __salt__['cmd.run']('lspci ', output_loglevel='debug')
+    return "\nlspci:\n" + info
 
-def _parted_start( dev ):
-	'''
-	get disk partition free sector start number 
-	'''
-	start = __salt__[shell_cmd]('parted -m -s ' + dev +
-		' unit s print free | grep free  | sort -t : -k 4n -k 2n  | tail -n 1 | cut -f 2 -d ":" | cut -f 1 -d "s" ', output_loglevel='debug' )
-	return int(start)
+
+def _parted_start(dev):
+    '''
+    get disk partition free sector start number
+    '''
+    start = __salt__[shell_cmd]('parted -m -s ' + dev + ' unit s print free |' +
+                                ' grep free  | sort -t : -k 4n -k 2n  | tail ' +
+                                ' -n 1 | cut -f 2 -d ":" | cut -f 1 -d "s" ',
+                                output_loglevel='debug')
+    return int(start)
+
 
 def prep_activate_osd_local(part, journal=None):
-	node = socket.gethostname()
-	return _prep_activate_osd( node, part, journal )
-
-def _prep_activate_osd( node, part, journal=None ):
-	ceph_conf_file = '/etc/ceph/ceph.conf'
-	osd_path = '/var/lib/ceph/osd'
-
-	uuid = __salt__['cmd.run']('uuidgen', env={'HOME':'/root'} )
-	# new_osd_id = __salt__['cmd.run']('ceph osd create ' + uuid, output_loglevel='debug', env={'HOME':'/root'} )
-
-	output = 'Node = ' + node + '\n'
-	output += 'Gen uuid = ' + uuid + '\n'
-	output += 'Journal file = ' + str(journal) + '\n'
+    node = socket.gethostname()
+    return _prep_activate_osd(node, part, journal)
 
 
-	fsid = ''
-	for line in fileinput.input( ceph_conf_file ):
-		if line.startswith( 'fsid' ):
-			fsid = line.split('=')[1].strip()
+def _prep_activate_osd(node, part, journal=None):
+    ceph_conf_file = '/etc/ceph/ceph.conf'
+    # osd_path = '/var/lib/ceph/osd'
 
-	# osd_name_dir = osd_path + '/ceph-' + new_osd_id
-	 #output += __salt__['cmd.run']('mkdir -p ' + osd_name_dir, output_loglevel='debug' ) + '\n'
+    uuid = __salt__['cmd.run']('uuidgen', env={'HOME': '/root'})
+    # new_osd_id = __salt__['cmd.run']('ceph osd create ' + uuid,
+    # output_loglevel='debug', env={'HOME':'/root'} )
 
-	output += 'FSID = ' + fsid + '\n'
+    output = 'Node = ' + node + '\n'
+    output += 'Gen uuid = ' + uuid + '\n'
+    output += 'Journal file = ' + str(journal) + '\n'
 
-	# new_partition = __salt__['cmd.run']('parted ' + part + ' mkpart xfs 2048s 100%', output_loglevel='debug' ) + '\n'
-	# prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type xfs --data-dev ' + part + ' ' + journal, output_loglevel='debug', env={'HOME':'/root'} )
-	if journal:
-		prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type xfs --data-dev ' + part + ' ' + journal, output_loglevel='debug', env={'HOME':'/root'} )
-	else:
-		prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluster-uuid '+ fsid + ' --fs-type xfs --data-dev ' + part, output_loglevel='debug', env={'HOME':'/root'} )
-	prep += '\n'
-	activate = __salt__['cmd.run']('ceph-disk activate ' + part + '1 ', output_loglevel='debug', env={'HOME':'/root'} )
-	return output+prep+activate
+    fsid = ''
+    for line in fileinput.input(ceph_conf_file):
+        if line.startswith('fsid'):
+            fsid = line.split('=')[1].strip()
 
-def _prep_activate_osd_old( node, part, journal ):
-	prep = __salt__['cmd.run']('ceph-deploy osd prepare '+ node + ':' + part + ':' + journal, output_loglevel='debug', runas=ceph_user, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
-	activate = __salt__['cmd.run']('ceph-deploy osd activate '+ node + ':' + part, output_loglevel='debug', runas=ceph_user, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
-	return prep+activate
+    # osd_name_dir = osd_path + '/ceph-' + new_osd_id
+    # output += __salt__['cmd.run']('mkdir -p ' +
+    # osd_name_dir, output_loglevel='debug')
 
-def _remove_journal( osd_num ):
-	'''
-	clean up journal file after osd removed
-	'''
-	if os.path.exists( '/var/lib/ceph/osd/journal/osd-' + str(osd_num)):
-		remove_journal = __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/journal/osd-' + str(osd_num), output_loglevel='debug')
-		return  str( osd_num ) + ' removed\n'
-	return 'No Journal being removed ' + str( osd_num ) + ' does not exist\n'
+    output += 'FSID = ' + fsid + '\n'
+
+    # new_partition = __salt__['cmd.run']('parted ' + part +
+    # ' mkpart xfs 2048s 100%', output_loglevel='debug' ) + '\n'
+    # prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph '
+    # prep = ' --cluster-uuid ' + fsid + ' --fs-type xfs --data-dev ' + part +
+    # prep = ' ' + journal, output_loglevel='debug', env={'HOME': '/root'} )
+    if journal:
+        prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph ' +
+                                   '--cluster-uuid ' + fsid + ' --fs-type xfs' +
+                                   ' --data-dev ' + part + ' ' +
+                                   journal, output_loglevel='debug',
+                                   env={'HOME': '/root'})
+    else:
+        prep = __salt__['cmd.run']('ceph-disk prepare --cluster ceph --cluste' +
+                                   'r-uuid ' + fsid + ' --fs-type xfs --data-' +
+                                   'dev ' + part, output_loglevel='debug',
+                                   env={'HOME': '/root'})
+    prep += '\n'
+    activate = __salt__['cmd.run']('ceph-disk activate ' + part + '1 ',
+                                   output_loglevel='debug',
+                                   env={'HOME': '/root'})
+    return output+prep+activate
+
+
+def _prep_activate_osd_old(node, part, journal):
+    prep = __salt__['cmd.run']('ceph-deploy osd prepare ' + node + ':' + part +
+                               ':' + journal, output_loglevel='debug',
+                               runas=ceph_user,
+                               cwd='/home/cephadmin/.ceph_sles_cluster_config')
+    activate = __salt__['cmd.run'](
+        'ceph-deploy osd activate ' + node + ':' + part,
+        output_loglevel='debug', runas=ceph_user,
+        cwd='/home/cephadmin/.ceph_sles_cluster_config')
+    return prep + activate
+
+
+def _remove_journal(osd_num):
+    '''
+    clean up journal file after osd removed
+    '''
+    if os.path.exists('/var/lib/ceph/osd/journal/osd-' + str(osd_num)):
+        __salt__['cmd.run']('rm -rf /var/lib/ceph/osd/journal/osd-' +
+                            str(osd_num), output_loglevel='debug')
+        return str(osd_num) + ' removed\n'
+    return 'No Journal being removed ' + str(osd_num) + ' does not exist\n'
+
 
 def _scsi_info():
-	'''
-	cat /proc/scsi/scsi disk profile record for the cluster information
-	'''
-	info = __salt__['cmd.run']('cat /proc/scsi/scsi', output_loglevel='debug' )
-	return "\n/proc/scsi/scsi:\n" + info
-
-def _umount_path( path ):
-	'''
-	umount the mount point by the path 
-	'''
-	umount = __salt__['cmd.run']('umount '+ path, output_loglevel='debug')
-	return umount
-
-def keygen(): 
-	'''
-	Create ssh key from the admin node Admin node should be the one running
-	ceph-deploy in the future
-
-	CLI Example:
-
-	.. code-block:: bash
-	salt 'node1' ceph_sles.keygen
-	'''
-
-	out_log  = __salt__['cmd.run']('ssh-keygen -b 2048 -t rsa -f /home/cephadmin/.ssh/id_rsa -q -N ""', output_loglevel='debug', runas=ceph_user)
-	# sshkey = salt_cmd.run('ssh-keygen', output_loglevel='debug', runas=ceph_user)
-	return out_log
+    '''
+    cat /proc/scsi/scsi disk profile record for the cluster information
+    '''
+    info = __salt__['cmd.run']('cat /proc/scsi/scsi', output_loglevel='debug')
+    return "\n/proc/scsi/scsi:\n" + info
 
 
-def send_key( *node_names ):
-	'''
-        Send ssh key from the admin node to the rest of the node allow 
-        ceph-deploy in the future
+def _umount_path(path):
+    '''
+    umount the mount point by the path
+    '''
+    umount = __salt__['cmd.run']('umount ' + path, output_loglevel='debug')
+    return umount
 
-	CLI Example:
 
-	.. code-block:: bash
-	salt 'node1' ceph_sles.send_key node1 node2 node3 ....
+def keygen():
+    '''
+    Create ssh key from the admin node Admin node should be the one running
+    ceph-deploy in the future
 
-        '''
-	out_log = []
-	for node in node_names :
-		out_log.append( __salt__['cmd.run']('ssh-keygen -R '+ socket.gethostbyname(node), output_loglevel='debug', runas=ceph_user))
-		out_log.append( __salt__['cmd.run']('ssh-keygen -R '+ node, output_loglevel='debug', runas=ceph_user))
-		out_log.append( __salt__['cmd.run']('ssh-keyscan '+ node +' >> ~/.ssh/known_hosts'  , output_loglevel='debug', runas=ceph_user))
-		# assume the kiwi image predefine user ceph with password suse1234
-		out_log.append( __salt__['cmd.run']('sshpass -p "suse1234" ssh-copy-id ceph@'+node , output_loglevel='debug', runas=ceph_user))
-	return out_log
+    CLI Example:
+
+    .. code-block:: bash
+    salt 'node1' ceph_sles.keygen
+    '''
+    out_log = __salt__['cmd.run'](
+        'ssh-keygen -b 2048 -t rsa -f /home/cephadmin/.ssh/id_rsa -q -N ""',
+        output_loglevel='debug', runas=ceph_user)
+    return out_log
+
+
+def send_key(*node_names):
+    '''
+    Send ssh key from the admin node to the rest of the node allow
+    ceph-deploy in the future
+    CLI Example:
+        .. code-block:: bash
+        salt 'node1' ceph_sles.send_key node1 node2 node3 ....
+    '''
+    out_log = []
+    for node in node_names:
+        out_log.append(__salt__['cmd.run'](
+            'ssh-keygen -R ' + socket.gethostbyname(node),
+            output_loglevel='debug', runas=ceph_user))
+        out_log.append(__salt__['cmd.run'](
+            'ssh-keygen -R ' + node,
+            output_loglevel='debug', runas=ceph_user))
+        out_log.append(__salt__['cmd.run'](
+            'ssh-keyscan ' + node + ' >> ~/.ssh/known_hosts',
+            output_loglevel='debug', runas=ceph_user))
+        # assume the kiwi image predefine user ceph with password suse1234
+        out_log.append(__salt__['cmd.run'](
+            'sshpass -p "suse1234" ssh-copy-id ceph@' + node,
+            output_loglevel='debug', runas=ceph_user))
+    return out_log
+
 
 def create_mon_node():
-	'''
+    '''
         Node creating mon with and monmap key file from master
 
-	CLI Example:
+    CLI Example:
 
-	.. code-block:: bash
-	salt 'node1' ceph_sles.create_mon_node fsid  
-	'''
-	node = socket.gethostname()
-	mon_dir = '/var/lib/ceph/mon/ceph-' + node
-	mon_key = 'ceph.mon.keyring'
-	mon_map = 'monmap' 
-	mon_key_file = '/tmp/'+ mon_key
-	mon_map_file = '/tmp/'+ mon_map
-	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
+    .. code-block:: bash
+    salt 'node1' ceph_sles.create_mon_node fsid
+    '''
+    node = socket.gethostname()
+    mon_dir = '/var/lib/ceph/mon/ceph-' + node
+    mon_key = 'ceph.mon.keyring'
+    mon_map = 'monmap'
+    mon_key_file = '/tmp/' + mon_key
+    mon_map_file = '/tmp/' + mon_map
+    # ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
 
-	output = __salt__['cmd.run']('mkdir -p ' + mon_dir,
-                              output_loglevel='debug', runas=admin_user)
-	output += '\nRunning ceph-mon --mkfs -i ' + node + ' --monmap ' + mon_map_file + ' --keyring ' + mon_key_file
-	output += __salt__['cmd.run']('ceph-mon --mkfs -i ' + node + ' --monmap ' + mon_map_file + ' --keyring ' +\
-	mon_key_file, output_loglevel='debug', runas=admin_user)
-	output += __salt__['cmd.run']('touch ' + mon_dir + '/done',
-                               output_loglevel='debug', runas=admin_user)
-	output += '\nEnabling ceph target service '+ node + ':' + str( __salt__['service.enable']('ceph.target') )
-	output += '\nEnabling ceph-mon at '+ node + ':' + str( __salt__['service.enable']('ceph-mon@'+node) )
-	output += '\nStarting ceph-mon at '+ node + ':' + str( __salt__['service.start']('ceph-mon@'+node) )
-	# output += __salt__['cmd.run']('rm ' + mon_key_file,  output_loglevel='debug')
-	# output += __salt__['cmd.run']('rm ' + mon_map_file,  output_loglevel='debug')
-	return output
+    output = __salt__['cmd.run']('mkdir -p ' + mon_dir, output_loglevel='debug',
+                                 runas=admin_user)
+    output += '\nRunning ceph-mon --mkfs -i ' + node + ' --monmap ' + \
+        mon_map_file + ' --keyring ' + mon_key_file + '\n'
+    output += __salt__['cmd.run']('ceph-mon --mkfs -i ' + node + ' --monmap ' +
+                                  mon_map_file + ' --keyring ' + mon_key_file,
+                                  output_loglevel='debug', runas=admin_user)
+    output += __salt__['cmd.run']('touch ' + mon_dir + '/done',
+                                  output_loglevel='debug', runas=admin_user)
+    output += '\nEnabling ceph target service ' + node + ':' + \
+        str(__salt__['service.enable']('ceph.target'))
+    output += '\nEnabling ceph-mon at ' + node + ':' + \
+        str(__salt__['service.enable']('ceph-mon@'+node))
+    output += '\nStarting ceph-mon at ' + node + ':' + \
+        str(__salt__['service.start']('ceph-mon@'+node))
+# output += __salt__['cmd.run']('rm ' + mon_key_file,  output_loglevel='debug')
+# output += __salt__['cmd.run']('rm ' + mon_map_file,  output_loglevel='debug')
+    return output
+
 
 def create_keys_all():
-	'''
-        Get into all mon node and create all bootstrap key and send it back to admin nod
+    '''
+    Get into all mon node and then create all bootstrap key and send it back to
+    the admin node.
+    CLI Example:
+        .. code-block:: bash
+        salt 'salt-master' ceph_sles.create_keys_all
+    '''
+    output = ''
+    ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
+    ceph_config_file = ceph_config_path + '/' + 'ceph.conf'
+    sm_cache_path = '/var/cache/salt/master/minions'
+    sm_config = '/etc/salt/master'
 
-	CLI Example:
+    allow_receive = __salt__[shell_cmd](
+        'grep file_recv ' + sm_config + '| grep True', output_loglevel='debug')
+    if not allow_receive:
+        return "Salt master require file_recv: True to push file from minion.\n"
 
-	.. code-block:: bash
-	salt 'salt-master' ceph_sles.create_keys_all
-	'''
-	output = ''
-	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
-        ceph_config_file = ceph_config_path + '/' + 'ceph.conf'
-	sm_cache_path = '/var/cache/salt/master/minions' 
-	sm_config = '/etc/salt/master' 
+    mds_bs_key = '/var/lib/ceph/bootstrap-mds/ceph.keyring'
+    osd_bs_key = '/var/lib/ceph/bootstrap-osd/ceph.keyring'
+    rgw_bs_key = '/var/lib/ceph/bootstrap-rgw/ceph.keyring'
 
-	allow_receive = __salt__[shell_cmd]('grep file_recv ' + sm_config + '| grep True', output_loglevel='debug')
-	if not allow_receive:
-		return "Salt master require to enable file_recv: True to push file from minion.\n"
+    __salt__[shell_cmd]('grep mon_host ' + ceph_config_file +
+                        '| cut -d "=" -f 2', output_loglevel='debug')
+    mon_nodes = __salt__[shell_cmd]('grep mon_initial_members ' +
+                                    ceph_config_file + '| cut -d "=" -f 2',
+                                    output_loglevel='debug')
+    if mon_nodes:
+        node_names = mon_nodes.strip().split(',')
 
-	mds_bs_key = '/var/lib/ceph/bootstrap-mds/ceph.keyring'
-	osd_bs_key = '/var/lib/ceph/bootstrap-osd/ceph.keyring'
-	rgw_bs_key = '/var/lib/ceph/bootstrap-rgw/ceph.keyring'
+    for node in node_names:
+        output += __salt__['cmd.run']('/usr/bin/salt "' + node.strip() +
+                                      '" ceph_sles.create_bootstrap_keys',
+                                      output_loglevel='debug') + '\n'
+    cp_push = '/usr/bin/salt "{}" cp.push'.format(node_names[0].strip())
+    mds_push = '{} {}'.format(cp_push, mds_bs_key)
+    osd_push = '{} {}'.format(cp_push, osd_bs_key)
+    rgw_push = '{} {}'.format(cp_push, rgw_bs_key)
 
+    output += 'Calling {} \n'.format(mds_push)
+    output += __salt__['cmd.run'](mds_push, output_loglevel='debug') + '\n'
+    output += 'Calling {} \n'.format(osd_push)
+    output += __salt__['cmd.run'](osd_push, output_loglevel='debug') + '\n'
+    output += 'Calling {} \n'.format(rgw_push)
+    output += __salt__['cmd.run'](rgw_push, output_loglevel='debug') + '\n'
 
-	mon_ips  = __salt__[shell_cmd]('grep mon_host ' + ceph_config_file + '| cut -d "=" -f 2', output_loglevel='debug')
-	mon_nodes= __salt__[shell_cmd]('grep mon_initial_members ' + ceph_config_file + '| cut -d "=" -f 2', output_loglevel='debug')
-	if mon_nodes:
-		node_names = mon_nodes.strip().split(',')
+    mv_base = '/usr/bin/mv {}/{}/files'.format(
+        sm_cache_path, node_names[0].strip())
 
-	for node in node_names:
-		output += __salt__['cmd.run']('/usr/bin/salt "' + node.strip() + '" ceph_sles.create_bootstrap_keys',  output_loglevel='debug' ) + '\n'
+    output += 'Moving {}{} to {}\n'.format(mv_base, mds_bs_key, mds_bs_key)
+    output += __salt__['cmd.run'](
+        '{}{} {}'.format(mv_base, mds_bs_key, mds_bs_key))
+    output += 'Moving {}{} to {}\n'.format(mv_base, osd_bs_key, osd_bs_key)
+    output += __salt__['cmd.run'](
+        '{}{} {}'.format(mv_base, osd_bs_key, osd_bs_key))
+    output += 'Moving {}{} to {}\n'.format(mv_base, rgw_bs_key, rgw_bs_key)
+    output += __salt__['cmd.run'](
+        '{}{} {}'.format(mv_base, rgw_bs_key, rgw_bs_key))
+    return output
 
-	output += 'Calling /usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + mds_bs_key + '\n'
-	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + mds_bs_key ,  output_loglevel='debug' ) + '\n'
-	output += 'Calling /usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + osd_bs_key + '\n'
-	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + osd_bs_key ,  output_loglevel='debug' ) + '\n'
-	output += 'Calling /usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + rgw_bs_key + '\n'
-	output += __salt__['cmd.run']('/usr/bin/salt "' + node_names[0].strip() + '" cp.push ' + rgw_bs_key ,  output_loglevel='debug' ) + '\n'
-
-	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ mds_bs_key + ' to ' + mds_bs_key + '\n'
-	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ mds_bs_key + ' ' + mds_bs_key ,  output_loglevel='debug' ) + '\n'
-	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ osd_bs_key + ' to ' + osd_bs_key + '\n'
-	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ osd_bs_key + ' ' + osd_bs_key ,  output_loglevel='debug' ) + '\n'
-	output += 'Moving ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ rgw_bs_key + ' to ' + rgw_bs_key + '\n'
-	output += __salt__['cmd.run']('/usr/bin/mv ' + sm_cache_path + '/' + node_names[0].strip() + '/files'+ rgw_bs_key + ' ' + rgw_bs_key ,  output_loglevel='debug' ) + '\n'
-		
-	return output
 
 def create_bootstrap_keys():
-	node = socket.gethostname()
-	output = ''
-	output += __salt__['cmd.run']('ceph-create-keys --cluster ceph --id ' + node, output_loglevel='debug', env={ 'HOME':'/root'})
-	return output
+    node = socket.gethostname()
+    output = __salt__['cmd.run']('ceph-create-keys --cluster ceph --id ' + node,
+                                 output_loglevel='debug', env={'HOME': '/root'})
+    return output
+
 
 def create_ceph_cfg_key():
-	admin_key_file = __salt__['ceph.keyring_create']( keyring_type='admin')
-	mon_key_file = __salt__['ceph.keyring_create']( keyring_type='mon')
-	osd_key_file = __salt__['ceph.keyring_create']( keyring_type='osd')
-	rgw_key_file = __salt__['ceph.keyring_create']( keyring_type='rgw')
-	mds_key_file = __salt__['ceph.keyring_create']( keyring_type='mds')
-	return admin_key_file + mon_key_file + osd_key_file + rgw_key_file + mds_key_file 
+    admin_key = __salt__['ceph.keyring_create'](keyring_type='admin')
+    mon_key = __salt__['ceph.keyring_create'](keyring_type='mon')
+    osd_key = __salt__['ceph.keyring_create'](keyring_type='osd')
+    rgw_key = __salt__['ceph.keyring_create'](keyring_type='rgw')
+    mds_key = __salt__['ceph.keyring_create'](keyring_type='mds')
+    return admin_key + mon_key + osd_key + rgw_key + mds_key
+
 
 def new_key_pillar():
-	pillar_out = 'admin_key:\n    \'' + get_key_ceph_cfg('admin') + '\'\n'
-	pillar_out += 'mon_key:\n    \'' + get_key_ceph_cfg('mon') + '\'\n'
-	pillar_out += 'osd_key:\n    \'' + get_key_ceph_cfg('osd') + '\'\n'
-	pillar_out += 'rgw_key:\n    \'' + get_key_ceph_cfg('rgw') + '\'\n'
-	pillar_out += 'mds_key:\n    \'' + get_key_ceph_cfg('mds') + '\'\n'
-	
-	pillar_path = '/srv/pillar/ceph/key/'
-	pillar_file = 'init.sls'
-	if not os.path.exists( pillar_path ):
-		mkdir_log  = __salt__['cmd.run']( 'mkdir -p ' + pillar_path, output_loglevel='debug' )
+    pillar_out = 'admin_key:\n    \'' + get_key_ceph_cfg('admin') + '\'\n'
+    pillar_out += 'mon_key:\n    \'' + get_key_ceph_cfg('mon') + '\'\n'
+    pillar_out += 'osd_key:\n    \'' + get_key_ceph_cfg('osd') + '\'\n'
+    pillar_out += 'rgw_key:\n    \'' + get_key_ceph_cfg('rgw') + '\'\n'
+    pillar_out += 'mds_key:\n    \'' + get_key_ceph_cfg('mds') + '\'\n'
 
-	pillar_full_path_file = pillar_path + pillar_file
-	outfile = open( pillar_full_path_file,  "w" )
-	outfile.write( pillar_out )
-	outfile.close()
-	pillar_out += 'Write keys to pillar file :' + pillar_full_path_file + '\n'
+    pillar_path = '/srv/pillar/ceph/key/'
+    pillar_file = 'init.sls'
+    if not os.path.exists(pillar_path):
+        mkdir_log = __salt__['cmd.run']('mkdir -p ' + pillar_path,
+                                        output_loglevel='debug')
+    pillar_full_path_file = pillar_path + pillar_file
+    outfile = open(pillar_full_path_file,  "w")
+    outfile.write(pillar_out)
+    outfile.close()
+    pillar_out += 'Write keys to pillar file :' + pillar_full_path_file + '\n'
 
-	top_pillar_path = '/srv/pillar/'
-	top_pillar_file = 'top.sls'
-	if not os.path.exists( top_pillar_path ):
-		mkdir_log  += __salt__['cmd.run']( 'mkdir -p ' + top_pillar_path, output_loglevel='debug' )
-	top_pillar_full_path_file = top_pillar_path + top_pillar_file
-	top_outfile = open( top_pillar_full_path_file,  'w' )
-	top_outfile.write( 'base:\n    "*":\n       - ceph.key\n    "*mon*":\n       - ceph.mon\n    "*osd*":\n       - ceph.osd\n' )
-	top_outfile.close()
-	pillar_out += 'Write top file :' + top_pillar_full_path_file + '\n'
+    top_pillar_path = '/srv/pillar/'
+    top_pillar_file = 'top.sls'
+    if not os.path.exists(top_pillar_path):
+        mkdir_log += __salt__['cmd.run']('mkdir -p ' + top_pillar_path,
+                                         output_loglevel='debug')
+    top_pillar_full_path_file = top_pillar_path + top_pillar_file
+    top_outfile = open(top_pillar_full_path_file,  'w')
+    top_outfile.write('base:\n    "*":\n       - ceph.key\n    "*mon*":\n')
+    top_outfile.write('       - ceph.mon\n    "*osd*":\n       - ceph.osd\n')
+    top_outfile.close()
+    pillar_out += 'Write top file :' + top_pillar_full_path_file + '\n'
+    return pillar_out
 
 
-	return pillar_out 
+def new_osd_pillar(nodelist, partlist):
+    pillar_out = ''
+    node_list = nodelist.split(",")
+    part_list = partlist.split(",")
 
-def new_osd_pillar( nodelist, partlist ):
-	pillar_out = ''
-        node_list = nodelist.split(",")
-        part_list = partlist.split(",")
+    for node in node_list:
+        pillar_out += '    ' + node + ':\n'
+        pillar_out += '         osd_dev:\n'
+        for part in part_list:
+            pillar_out += '            ' + part + '\n'
+    pillar_path = '/srv/pillar/ceph/osd/'
+    pillar_file = 'init.sls'
+    if not os.path.exists(pillar_path):
+        mkdir_log = __salt__['cmd.run']('mkdir -p ' + pillar_path,
+                                        output_loglevel='debug')
 
-	for node in node_list:
-		pillar_out += '    ' + node + ':\n'
-		pillar_out += '         osd_dev:\n'
-		for part in part_list:
-			pillar_out += '            ' + part + '\n'
-	
-	pillar_path = '/srv/pillar/ceph/osd/'
-	pillar_file = 'init.sls'
-	if not os.path.exists( pillar_path ):
-		mkdir_log  = __salt__['cmd.run']( 'mkdir -p ' + pillar_path, output_loglevel='debug' )
+    pillar_full_path_file = pillar_path + pillar_file
+    outfile = open(pillar_full_path_file,  "w")
+    outfile.write(pillar_out)
+    outfile.close()
+    pillar_out += 'Write osd_dev to pillar file:' + pillar_full_path_file + '\n'
 
-	pillar_full_path_file = pillar_path + pillar_file
-	outfile = open( pillar_full_path_file,  "w" )
-	outfile.write( pillar_out )
-	outfile.close()
-	pillar_out += 'Write osd_dev to pillar file :' + pillar_full_path_file + '\n'
+    top_pillar_path = '/srv/pillar/'
+    top_pillar_file = 'top.sls'
+    if not os.path.exists(top_pillar_path):
+        mkdir_log += __salt__['cmd.run']('mkdir -p ' + top_pillar_path,
+                                         output_loglevel='debug')
+    top_pillar_full_path_file = top_pillar_path + top_pillar_file
+    top_outfile = open(top_pillar_full_path_file,  'w')
+    top_outfile.write('base:\n    "*":\n       - ceph.key\n    "*mon*":\n')
+    top_outfile.write('       - ceph.mon\n    "*osd*":\n       - ceph.osd\n')
+    top_outfile.close()
+    pillar_out += 'Write top file :' + top_pillar_full_path_file + '\n'
+    pillar_out += __salt__['cmd.run']('salt "*" saltutil.refresh_pillar',
+                                      output_loglevel='debug')
+    return pillar_out
 
-	top_pillar_path = '/srv/pillar/'
-	top_pillar_file = 'top.sls'
-	if not os.path.exists( top_pillar_path ):
-		mkdir_log  += __salt__['cmd.run']( 'mkdir -p ' + top_pillar_path, output_loglevel='debug' )
-	top_pillar_full_path_file = top_pillar_path + top_pillar_file
-	top_outfile = open( top_pillar_full_path_file,  'w' )
-	top_outfile.write( 'base:\n    "*":\n       - ceph.key\n    "*mon*":\n       - ceph.mon\n    "*osd*":\n       - ceph.osd\n' )
-	top_outfile.close()
-	pillar_out += 'Write top file :' + top_pillar_full_path_file + '\n'
 
-	pillar_out += __salt__['cmd.run']( 'salt "*" saltutil.refresh_pillar', output_loglevel='debug')
+def get_key_ceph_cfg(keyring_type):
+    key_file = __salt__['ceph.keyring_create'](keyring_type=keyring_type)
+    m = re.findall(r'key\s=\s(.*)', key_file)
+    return m[0]
 
-	return pillar_out 
 
-def get_key_ceph_cfg( keyring_type ):
-	key_file = __salt__['ceph.keyring_create']( keyring_type=keyring_type)
-	m = re.findall(r'key\s=\s(.*)', key_file)
-	return m[0]
+def new_ceph_cfg(*node_names):
+    '''
+    Create new ceph cluster configuration step by step
+    CLI Example:
+        .. code-block:: bash
+        salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
+    '''
+    ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
+    pillar_ceph_config_path = '/srv/pillar/ceph'
+    salt_ceph_config_path = '/srv/salt/ceph'
+    # mon_keyring_name = 'ceph.mon.keyring'
+    # admin_keyring_name = 'ceph.client.admin.keyring'
+    # monmap_name = 'monmap'
+    output = 'Creating default config file with node names - '
+    if not os.path.exists(ceph_config_path):
+        output += __salt__['cmd.run']('mkdir -p '+ceph_config_path,
+                                      output_loglevel='debug', runas=ceph_user)
+    if not os.path.exists(pillar_ceph_config_path):
+        output += __salt__['cmd.run']('mkdir -p ' + pillar_ceph_config_path,
+                                      output_loglevel='debug')
+    if not os.path.exists(salt_ceph_config_path):
+        output += __salt__['cmd.run']('mkdir -p ' + salt_ceph_config_path,
+                                      output_loglevel='debug')
+    global_config = "[global]"
+    uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug',
+                               runas=ceph_user)
+    uuid_config = "fsid = " + uuid
+    mon_initial_member_config = "mon_initial_members = "
+    mon_host_config = "mon_host = "
 
-def new_ceph_cfg( *node_names ):
+    auth_config = "auth_cluster_required = cephx\nauth_service_required = " +\
+        "cephx\nauth_client_required = cephx"
+    filestore_config = "filestore_xattr_use_omap = true"
+
+    node_ip = []
+    members_ip = ''
+    monmap_list = ''
+    if len(node_names) > 1:
+        members = ', '.join(node_names)
+        for node in node_names:
+            ip = socket.gethostbyname(node)
+            node_ip.append(ip)
+            monmap_list += '--add ' + node + ' ' + str(ip) + ' '
+        members_ip = ', '.join(node_ip)
+    else:
+        members = str(node_names[0])
+        members_ip = socket.gethostbyname(str(node_names[0]))
+        monmap_list += '--add ' + members + ' ' + members_ip + ' '
+
+    output += mon_initial_member_config + members + '\n'
+
+    config_out = global_config + '\n'
+    config_out += uuid_config + '\n'
+    config_out += mon_initial_member_config + members + '\n'
+    config_out += mon_host_config + members_ip + '\n'
+    config_out += auth_config + '\n'
+    config_out += filestore_config + '\n'
+
+    ceph_config_file = ceph_config_path + '/' + 'ceph.conf'
+    logfile = open(ceph_config_file, "w")
+    logfile.write(config_out)
+    logfile.close()
+    os.chown(ceph_config_file, ceph_uid, 100)
+
+    salt_ceph_config_file = salt_ceph_config_path + '/' + 'ceph.conf'
+    salt_file = open(salt_ceph_config_file, "w")
+    salt_file.write(config_out)
+    salt_file.close()
+
+    pillar_info = 'fsid:\n    \'' + uuid + '\'\n'
+    pillar_info += 'mon:\n    ' + members + '\n'
+    pillar_mon_config_path = '/srv/pillar/ceph/mon'
+    if not os.path.exists(pillar_mon_config_path):
+        output += __salt__['cmd.run']('mkdir -p '+pillar_mon_config_path,
+                                      output_loglevel='debug')
+    ceph_info_pillar_file = pillar_mon_config_path + '/' + 'init.sls'
+    ceph_info_out = open(ceph_info_pillar_file, "w")
+    ceph_info_out.write(pillar_info)
+    ceph_info_out.close()
+    output += 'Write mon and key to pillar file:' + ceph_info_pillar_file + '\n'
+
+    push_conf(*node_names)
+    push_conf(socket.gethostname())
+
+    # it doesn't work ...
+    # output += __salt__['saltutil'].refresh_pillar()
+    output += __salt__['cmd.run']('salt "*" saltutil.refresh_pillar',
+                                  output_loglevel='debug')
+    return output
+
+
+def new_mon(*node_names):
 	'''
-        Create new ceph cluster configuration step by step 
-
-	CLI Example:
-
-	.. code-block:: bash
-	salt 'node1' ceph_sles.new_mon node1 node2 node3 ....
-	'''
-	ceph_config_path = '/home/cephadmin/.ceph_sles_cluster_config'
-	pillar_ceph_config_path = '/srv/pillar/ceph'
-	salt_ceph_config_path = '/srv/salt/ceph' 
-	mon_keyring_name = 'ceph.mon.keyring'
-	admin_keyring_name = 'ceph.client.admin.keyring'
-	monmap_name = 'monmap'
-	output = 'Creating default config file with node names - '
-	if not os.path.exists( ceph_config_path ):
-		output += __salt__['cmd.run']( 'mkdir -p '+ceph_config_path, output_loglevel='debug', runas=ceph_user)
-	if not os.path.exists( pillar_ceph_config_path ):
-		output += __salt__['cmd.run']( 'mkdir -p '+pillar_ceph_config_path, output_loglevel='debug' )
-	if not os.path.exists( salt_ceph_config_path ):
-		output += __salt__['cmd.run']( 'mkdir -p '+salt_ceph_config_path, output_loglevel='debug' )
-
-	global_config = "[global]"
-	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas=ceph_user)
-	uuid_config = "fsid = " + uuid
-	mon_initial_member_config = "mon_initial_members = "
-	mon_host_config = "mon_host = "
-
-	auth_config = "auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx"
-	filestore_config = "filestore_xattr_use_omap = true"
-
-	node_ip = []
-	members_ip = ''
-	monmap_list = ''
-	if len(node_names) > 1:
-		members = ', '.join( node_names )
-		for node in node_names:
-			ip = socket.gethostbyname(node)
-			node_ip.append( ip )
-			monmap_list += '--add ' + node +  ' ' + str(ip) + ' '
-		members_ip = ', '.join( node_ip )
-	else:
-		members = str(node_names[0])
-		members_ip = socket.gethostbyname(str(node_names[0]))
-		monmap_list += '--add ' + members + ' ' +  members_ip + ' '
-
-	output += mon_initial_member_config + members + '\n'
-
-	config_out = global_config + '\n'
-	config_out += uuid_config + '\n'
-	config_out += mon_initial_member_config + members + '\n'
-	config_out += mon_host_config + members_ip + '\n'
-	config_out += auth_config + '\n'
-	config_out += filestore_config + '\n'
-
-
-	ceph_config_file = ceph_config_path + '/' + 'ceph.conf'
-	logfile = open( ceph_config_file ,  "w" )
-	logfile.write( config_out )
-	logfile.close()
-	os.chown(ceph_config_file, ceph_uid, 100)
-
-	salt_ceph_config_file = salt_ceph_config_path + '/' + 'ceph.conf' 
-	salt_file = open( salt_ceph_config_file ,  "w" )
-	salt_file.write( config_out )
-	salt_file.close()
-
-	pillar_info = 'fsid:\n    \'' + uuid + '\'\n'
-	pillar_info += 'mon:\n    ' + members + '\n'
-	
-	pillar_mon_config_path = '/srv/pillar/ceph/mon'
-	if not os.path.exists( pillar_mon_config_path ):
-		output += __salt__['cmd.run']( 'mkdir -p '+pillar_mon_config_path, output_loglevel='debug' )
-	ceph_info_pillar_file = pillar_mon_config_path + '/' + 'init.sls'
-	ceph_info_out = open( ceph_info_pillar_file ,  "w" )
-	ceph_info_out.write( pillar_info )
-	ceph_info_out.close()
-	output += 'Write mon and key to pillar file :' + ceph_info_pillar_file + '\n'
-
-	push_conf( *node_names )
-	push_conf( socket.gethostname() )
-
-	# it doesn't work ... 
-	#output += __salt__['saltutil'].refresh_pillar()
-	output += __salt__['cmd.run']( 'salt "*" saltutil.refresh_pillar', output_loglevel='debug')
-	return output
-
-def new_mon( *node_names ):
-	'''
-        Create new ceph cluster configuration step by step 
+        Create new ceph cluster configuration step by step
 
 	CLI Example:
 
