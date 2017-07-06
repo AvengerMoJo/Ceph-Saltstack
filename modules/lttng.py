@@ -47,6 +47,28 @@ def __virtual__():
     return __virtual_name__
 
 
+lttng_block_switch = [
+    "block_touch_buffer",
+    "block_dirty_buffer",
+    "block_rq_abort",
+    "block_rq_requeue",
+    "block_rq_complete",
+    "block_rq_insert",
+    "block_rq_issue",
+    "block_bio_bounce",
+    "block_bio_complete",
+    "block_bio_backmerge",
+    "block_bio_frontmerge",
+    "block_bio_queue",
+    "block_getrq",
+    "block_sleeprq",
+    "block_plug",
+    "block_unplug",
+    "block_split",
+    "block_bio_remap",
+    "block_rq_remap"]
+
+
 lttng_kernel_switch = ["sched_switch",
                        "sched_process_fork",
                        "sched_process_exec",
@@ -85,7 +107,9 @@ lttng_kernel_switch = ["sched_switch",
                        "net_if_receive_skb",
                        "net_dev_queue"]
 
-lttng_kernel_switch_string = ",".join(lttng_kernel_switch)
+lttng_final_switch = lttng_block_switch + lttng_kernel_switch
+
+lttng_kernel_switch_string = ",".join(lttng_final_switch)
 
 
 def run(cmd):
