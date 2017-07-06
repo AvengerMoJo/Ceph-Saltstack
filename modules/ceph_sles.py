@@ -630,17 +630,17 @@ def new_mon( *node_names ):
 	
 	output += "Create mon key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + mon_key_filename + \
 	' --gen-key -n mon. --cap mon "allow *"', output_loglevel='debug',
-                                                          runas=admin_user) + '\n'
+                                                          runas=ceph_user) + '\n'
 	output += "Create admin key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + admin_key_filename + \
 	' --gen-key -n client.admin --set-uid=0 --cap mon "allow *" --cap osd "allow *" --cap mds "allow *"',\
-	 output_loglevel='debug', runas=admin_user) + '\n'
+	 output_loglevel='debug', runas=ceph_user) + '\n'
 
 
 	join_keyring = __salt__['cmd.run']('ceph-authtool ' + mon_key_filename + ' --import-keyring ' +\
- 	admin_key_filename, output_loglevel='debug', runas=admin_user)
+ 	admin_key_filename, output_loglevel='debug', runas=ceph_user)
 
 	output += "Monmaptool create :\n" + __salt__['cmd.run']('monmaptool --create ' + monmap_list + ' --fsid ' + uuid + \
-	' --clobber ' + monmap_filename, output_loglevel='debug', runas=admin_user) + '\n'
+	' --clobber ' + monmap_filename, output_loglevel='debug', runas=ceph_user) + '\n'
 
 	if len(node_names) > 1:
 		for node in node_names:
