@@ -1326,38 +1326,37 @@ def prep_osd_ssd_journal( nodelist=None, partlist=None):
 
 
 def prep_osd( nodelist=None, partlist=None, journal_path=None):
-	'''
-	Prepare all the osd and activate them 
+    '''
+    Prepare all the osd and activate them
+    CLI Example:
+        .. code-block:: bash
+        salt 'node1' ceph_sles.prep_osd "node1,node2,node3" "/dev/sda5,/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde"
+    '''
+    # journal_path = '/var/lib/ceph/osd/journal/osd'
+    result = ""
+    node_list = nodelist.split(",")
+    part_list = partlist.split(",")
 
-	CLI Example:
-
-	.. code-block:: bash
-	salt 'node1' ceph_sles.prep_osd "node1,node2,node3" "/dev/sda5,/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde"
-
-	'''
-	#journal_path = '/var/lib/ceph/osd/journal/osd'
-		
-	result = ""
-	node_list = nodelist.split(",")
-	part_list = partlist.split(",")
-
-	new_osd_id = __salt__[shell_cmd]('ceph osd ls | tail -n 1', output_loglevel='debug', env={'HOME':'/root'} )
-
+    # check the biggest osd id is 
+    new_osd_id = __salt__[shell_cmd]('ceph osd ls | tail -n 1', output_loglevel='debug', env={'HOME':'/root'} )
 	if not new_osd_id:
-		osd_num = 0
-	else:
-		osd_num = int(new_osd_id)
+        osd_num = 0
+    else:
+        osd_num = int(new_osd_id)
 
-
-	for part in part_list:
-		for node in node_list:
-			if journal_path: 
-				result += __salt__['cmd.run']('salt --async "' + node + '" ceph_sles.prep_activate_osd_local ' + part + ' ' + journal_path + '-' + str(osd_num), output_loglevel='debug' ) + '\n'
+    aync_prep = 'salt --async "{}" ceph_sles.prep_activate_osd_local {}'
+    for part in part_list:
+        for node in node_list:
+            prep_run = aync_prep.format(node, part)
+            if journal_path:
+                result += __salt__['cmd.run'](
+                    '{} {}-{}'.format(prep_run, journal_path, str(osd_num))
+                    , output_loglevel='debug' ) + '\n'
 			else:
-				result += __salt__['cmd.run']('salt --async "' + node + '" ceph_sles.prep_activate_osd_local ' + part, output_loglevel='debug' ) + '\n'
-			# result += _prep_activate_osd( node, part, journal_path+str(osd_num))
+				result += __salt__['cmd.run'](
+                    prep_run, output_loglevel='debug' ) + '\n'
 			osd_num += 1
-	return result
+    return result
 
 def list_osd():
 	'''
