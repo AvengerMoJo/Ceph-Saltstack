@@ -52,7 +52,7 @@ def run(cluster=None, exclude=None, cmd=None, cmd_server=None, block_off=None):
             log.debug("lttng.run: cluster_network {}".format(cluster_addresses))
 
         log.debug("lttng.run: start {}".format(cluster_addresses))
-        reports = _start(cluster_addresses)
+        reports = _start(cluster_addresses, block_off)
         log.debug("lttng.run: report {}".format(reports))
 
     else:
