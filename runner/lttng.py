@@ -16,13 +16,13 @@ lttng runner to conduct all the lttng in different nodes
 log = logging.getLogger(__name__)
 
 
-def run(cluster=None, exclude=None, cmd=None, cmd_server=None, **kwargs):
+def run(cluster=None, exclude=None, cmd=None, cmd_server=None, block_off=None):
     '''
     lttng tracing the cluster networkj
     CLI Example: (Before DeepSea with a cluster configuration)
     .. code-block:: bash
         sudo salt-run lttng_trace.run cluster=ceph exclude=10.0.0.2
-        cmd='/full/path' cmd_server=minion_node
+        cmd='/full/path' cmd_server=minion_node block_off=true
     or we can test it with a cluster
     '''
     cluster_addresses = []
@@ -78,15 +78,17 @@ def run(cluster=None, exclude=None, cmd=None, cmd_server=None, **kwargs):
             log.debug("lttng.run: cluster_network {}".format(cluster_addresses))
 
         log.debug("lttng.run: start {}".format(cluster_addresses))
-        reports = _start(cluster_addresses)
+        reports = _start(cluster_addresses, block_off)
         log.debug("lttng.run: report {}".format(reports))
 
     time.sleep(3)
+
     if not cmd_server:
         cmd_server = socket.gethostname()
     local = salt.client.LocalClient()
     log.debug("lttng.run cmd = {}".format(cmd))
     p = local.cmd("E@" + cmd_server, 'lttng.do_run', cmd, expr_form="compound")
+
     time.sleep(3)
 
     log.debug("lttng.run: cluster {}".format(cluster_addresses))
