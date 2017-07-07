@@ -108,11 +108,10 @@ lttng_kernel_switch = ["sched_switch",
                        "net_dev_queue"]
 
 lttng_final_switch = lttng_block_switch + lttng_kernel_switch
-
 lttng_kernel_switch_string = ",".join(lttng_final_switch)
 
 
-def run(cmd):
+def run(cmd, block_off=None):
     '''
     CLI Example:
         .. code-block:: bash
@@ -134,6 +133,10 @@ def run(cmd):
     date_now = datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
     node = socket.gethostname()
     report_path = node + '-' + date_now
+
+    if(block_off):
+        lttng_final_switch = lttng_kernel_switch
+        lttng_kernel_switch_string = ",".join(lttng_final_switch)
 
     if not os.path.exists(lttng_output_path):
         mkdir = Popen(['/usr/bin/mkdir', '-p', lttng_output_path])
@@ -191,11 +194,11 @@ def collect_file(report_name):
     return node, send_log
 
 
-def prepare():
+def prepare(block_off=None):
     '''
     CLI Example:
         .. code-block:: bash
-        sudo salt 'node' lttng.prepare
+        sudo salt 'node' lttng.prepare block_off=true
 
     lttng start and run cmd and the capture result for reporting as following:
 
@@ -206,6 +209,9 @@ def prepare():
     lttng start
 
     '''
+    if(block_off):
+        lttng_final_switch = lttng_kernel_switch
+        lttng_kernel_switch_string = ",".join(lttng_final_switch)
     date_now = datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
     node = socket.gethostname()
     report_path = node + '-' + date_now

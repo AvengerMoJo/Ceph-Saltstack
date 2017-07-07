@@ -81,13 +81,13 @@ def run(cluster=None, exclude=None, cmd=None, cmd_server=None, **kwargs):
         reports = _start(cluster_addresses)
         log.debug("lttng.run: report {}".format(reports))
 
+    time.sleep(3)
     if not cmd_server:
         cmd_server = socket.gethostname()
     local = salt.client.LocalClient()
     log.debug("lttng.run cmd = {}".format(cmd))
     p = local.cmd("E@" + cmd_server, 'lttng.do_run', cmd, expr_form="compound")
-
-    time.sleep(20)
+    time.sleep(3)
 
     log.debug("lttng.run: cluster {}".format(cluster_addresses))
     reports = _finish(cluster_addresses, reports)
@@ -171,13 +171,16 @@ def _address(addresses, network):
     return matched
 
 
-def _start(addresses):
+def _start(addresses, block_off=None):
     result = []
     local = salt.client.LocalClient()
+    lttng_prepare = 'lttng.prepare'
+    if(block_off):
+        lttng_prepare = 'lttng.prepare block_off=ture'
     for server in addresses:
         log.debug("lttng._start: node {} ".format(server))
         local.cmd("S@" + server, 'lttng.clean_output', expr_form="compound")
-        node_ip, dir_name = local.cmd("S@" + server, 'lttng.prepare',
+        node_ip, dir_name = local.cmd("S@" + server, lttng_prepare,
                                       expr_form="compound").popitem()
         log.debug("lttng._start: dir_name {} ".format(dir_name))
         result.append(dir_name)
