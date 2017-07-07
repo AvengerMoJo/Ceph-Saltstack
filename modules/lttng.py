@@ -137,6 +137,9 @@ def run(cmd, block_off=None):
     if(block_off):
         lttng_final_switch = lttng_kernel_switch
         lttng_kernel_switch_string = ",".join(lttng_final_switch)
+    else:
+        lttng_final_switch = lttng_block_switch + lttng_kernel_switch
+        lttng_kernel_switch_string = ",".join(lttng_final_switch)
 
     if not os.path.exists(lttng_output_path):
         mkdir = Popen(['/usr/bin/mkdir', '-p', lttng_output_path])
@@ -211,6 +214,9 @@ def prepare(block_off=None):
     '''
     if(block_off):
         lttng_final_switch = lttng_kernel_switch
+        lttng_kernel_switch_string = ",".join(lttng_final_switch)
+    else:
+        lttng_final_switch = lttng_block_switch + lttng_kernel_switch
         lttng_kernel_switch_string = ",".join(lttng_final_switch)
     date_now = datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
     node = socket.gethostname()
