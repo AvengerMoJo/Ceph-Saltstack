@@ -794,10 +794,9 @@ def push_conf(*node_names):
     c_conf_dir = '/home/cephadmin/.ceph_sles_cluster_config/'
     c_conf_file = c_conf_dir + 'ceph.conf'
     client_key = 'ceph.client.admin.keyring'
-    client_key_file  = c_conf_dir + client_key
+    client_key_file = c_conf_dir + client_key
     rgw_key = 'ceph.client.radosgw.keyring'
     rgw_key_file = c_conf_dir + rgw_key
-    node_list = ''
     out_log = ''
     for node in node_names:
         cp_conf = 'salt-cp "{}" {} /etc/ceph/'
@@ -812,7 +811,7 @@ def push_conf(*node_names):
         if salt_utils.istextfile(c_conf_dir + '/' + rgw_key):
             out_log += __salt__['cmd.run'](
                 cp_conf.format(node, rgw_key_file),
-                               output_loglevel='debug') + '\n'
+                output_loglevel='debug') + '\n'
 
     # need to change permission
     # /etc/ceph/ceph.client.admin.keyring
@@ -821,26 +820,33 @@ def push_conf(*node_names):
 
     return out_log
 
+
 def push_key(*node_names):
     '''
     Send bootstrape key to OSD node
     CLI Example:
-
-    .. code-block:: bash
-    salt 'salt-master' ceph_sles.push_key osd_node1 osd_node2 osd_node3 ....
+        .. code-block:: bash
+        salt 'salt-master' ceph_sles.push_key osd_node1 osd_node2 osd_node3 ....
      '''
     mds_bs_key = '/var/lib/ceph/bootstrap-mds/ceph.keyring'
     osd_bs_key = '/var/lib/ceph/bootstrap-osd/ceph.keyring'
     rgw_bs_key = '/var/lib/ceph/bootstrap-rgw/ceph.keyring'
+    cp_line = 'salt-cp "{}" {} {}'
     out_log = ''
     for node in node_names:
         out_log += node + ':\n'
         if salt_utils.istextfile(mds_bs_key):
-            out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + mds_bs_key + ' ' + mds_bs_key, output_loglevel='debug') + '\n'
+            out_log += __salt__['cmd.run'](
+                cp_line.format(node, mds_bs_key, mds_bs_key),
+                output_loglevel='debug') + '\n'
         if salt_utils.istextfile(osd_bs_key):
-            out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + osd_bs_key + ' ' + osd_bs_key, output_loglevel='debug') + '\n'
+            out_log += __salt__['cmd.run'](
+                cp_line.format(node, osd_bs_key, osd_bs_key),
+                output_loglevel='debug') + '\n'
         if salt_utils.istextfile(rgw_bs_key):
-            out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + rgw_bs_key + ' ' + rgw_bs_key, output_loglevel='debug') + '\n'
+            out_log += __salt__['cmd.run'](
+                cp_line.format(node, rgw_bs_key, rgw_bs_key),
+                output_loglevel='debug') + '\n'
     return out_log
 
 
@@ -856,7 +862,6 @@ def bench_disk(*disk_dev):
     dev_list = ''
     mount_list = {}
     for dev in disk_dev:
-        item = {}
         if __salt__['file.is_blkdev'](dev):
             dev_list += dev + ' '
             mount_point = __salt__[shell_cmd]('mount | grep ' + dev + ' | cut -f 3 -d \' \'')
@@ -897,11 +902,12 @@ def bench_network(master_node, *client_node):
         iperf_out = __salt__['state.sls']('iperf')
     else:
         for node in client_node:
-            time.sleep(15) # delays for 15 seconds
+            time.sleep(15)  # delays for 15 seconds
             if node == node_name:
                 iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -c ' + master_node + ' -d', output_loglevel='debug')
                 break
     return iperf_out
+
 
 def iperf(cpu_num, port_num, server):
     '''
@@ -916,7 +922,7 @@ def iperf(cpu_num, port_num, server):
     outpath = '/tmp/iperf/'
 
     if not os.path.exists(outpath):
-        mkdir_log  = __salt__['cmd.run']('mkdir -p ' + outpath, output_loglevel='debug', runas=ceph_user)
+        __salt__['cmd.run']('mkdir -p ' + outpath, output_loglevel='debug', runas=ceph_user)
 
     outfile = outpath + server + '.c' + str(cpu_num) + '.' + str(port_num) + '.iperf.dat'
     ceph_info_out = open(outfile,  "w")
