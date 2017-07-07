@@ -177,12 +177,15 @@ def _start(addresses, block_off=None):
     result = []
     local = salt.client.LocalClient()
     lttng_prepare = 'lttng.prepare'
+    lttng_options = ''
     if(block_off):
-        lttng_prepare = 'lttng.prepare block_off=ture'
+        lttng_options = 'block_off=ture'
+
     for server in addresses:
         log.debug("lttng._start: node {} ".format(server))
         local.cmd("S@" + server, 'lttng.clean_output', expr_form="compound")
         node_ip, dir_name = local.cmd("S@" + server, lttng_prepare,
+                                      [lttng_options],
                                       expr_form="compound").popitem()
         log.debug("lttng._start: dir_name {} ".format(dir_name))
         result.append(dir_name)
