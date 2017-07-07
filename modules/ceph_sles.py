@@ -666,26 +666,25 @@ def new_mon(*node_names):
 	uuid = __salt__['cmd.run']('uuidgen', output_loglevel='debug', runas=ceph_user)
 	uuid_config = "fsid = " + uuid
 	mon_initial_member_config = "mon_initial_members = "
-	mon_host_config = "mon_host = " 
+	mon_host_config = "mon_host = "
 
 	auth_config = "auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx"
 	filestore_config = "filestore_xattr_use_omap = true"
 
-	node_ip = []  
+	node_ip = []
 	members_ip = ''
 	monmap_list = ''
 	if len(node_names) > 1:
 		members = ', '.join( node_names )
 		for node in node_names:
-			ip = socket.gethostbyname(node) 
-			node_ip.append( ip ) 
+			ip = socket.gethostbyname(node)
+			node_ip.append( ip )
 			monmap_list += '--add ' + node +  ' ' + str(ip) + ' '
 		members_ip = ', '.join( node_ip )
 	else:
 		members = str(node_names[0])
 		members_ip = socket.gethostbyname(str(node_names[0]))
 		monmap_list += '--add ' + members + ' ' +  members_ip + ' '
-	
 
 	config_out = global_config + '\n'
 	config_out += uuid_config + '\n'
@@ -694,16 +693,15 @@ def new_mon(*node_names):
 	config_out += auth_config + '\n'
 	config_out += filestore_config + '\n'
 
-	ceph_config_file = ceph_config_path + '/' + 'ceph.conf' 
+	ceph_config_file = ceph_config_path + '/' + 'ceph.conf'
 	logfile = open( ceph_config_file ,  "w" )
 	logfile.write( config_out )
 	logfile.close()
 	os.chown(ceph_config_file, ceph_uid, 100)
 
-	mon_key_filename =  ceph_config_path + '/' + mon_keyring_name 
+	mon_key_filename =  ceph_config_path + '/' + mon_keyring_name
 	admin_key_filename = ceph_config_path + '/' + admin_keyring_name
 	monmap_filename = '/tmp/' + monmap_name
-	
 	output += "Create mon key ring:\n" + __salt__['cmd.run']('ceph-authtool --create-keyring ' + mon_key_filename + \
 	' --gen-key -n mon. --cap mon "allow *"', output_loglevel='debug',
                                                           runas=ceph_user) + '\n'
@@ -739,13 +737,13 @@ def new_mon(*node_names):
 
 	output += "Push conf to " + str(node_names) + ":\n"
 	push_conf( *node_names )
-	
+
 	return output
 
 def new_mon_old( *node_names ):
 	'''
         Create new ceph cluster configuration by running ceph-deploy new, mon
-	create-initial, admin 
+	create-initial, admin
 
 	CLI Example:
 
@@ -757,8 +755,7 @@ def new_mon_old( *node_names ):
 	node_list = ''
 	for node in node_names :
 		node_list = node_list + node + ' '
-	
-	if not os.path.exists( '/home/cephadmin/.ceph_sles_cluster_config' ): 
+	if not os.path.exists( '/home/cephadmin/.ceph_sles_cluster_config' ):
 		mkdir_log  = __salt__['cmd.run']('mkdir -p /home/cephadmin/.ceph_sles_cluster_config', output_loglevel='debug', runas=ceph_user)
 
 	if not salt_utils.istextfile( '/home/cephadmin/.ceph_sles_cluster_config/ceph.conf' ):
@@ -774,7 +771,7 @@ def purge_mon():
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.purge_mon  
+	salt 'node1' ceph_sles.purge_mon
 	'''
 	node = socket.gethostname()
 	ceph_conf_dir = '/etc/ceph/*'
@@ -795,7 +792,7 @@ def push_conf( *node_names ):
 	.. code-block:: bash
 	salt 'node1' ceph_sles.ceph_push node1 node2 node3 ....
 	'''
-	c_conf_dir ='/home/cephadmin/.ceph_sles_cluster_config/' 
+	c_conf_dir ='/home/cephadmin/.ceph_sles_cluster_config/'
 	client_key ='ceph.client.admin.keyring'
 	rgw_key ='ceph.client.radosgw.keyring'
 	node_list = ''
@@ -811,11 +808,11 @@ def push_conf( *node_names ):
 		if salt_utils.istextfile( c_conf_dir + '/' + rgw_key ):
 			out_log += __salt__['cmd.run']('salt-cp "' + node + '" '+ c_conf_dir + '/' + rgw_key + ' /etc/ceph/', output_loglevel='debug' ) + '\n'
 
-	# need to change permission 
+	# need to change permission
 	# /etc/ceph/ceph.client.admin.keyring
 	# ceph_key = '/etc/ceph/ceph.client.admin.keyring'
 	# os.chown(ceph_key, ceph_uid, 100)
-	
+
 	return out_log
 
 def push_key( *node_names ):
@@ -850,26 +847,26 @@ def bench_disk( *disk_dev ):
 	.. code-block:: bash
 	salt 'node1' ceph_sles.bench_disk /dev/sda /dev/sdb ...
         '''
-	dev_list = '' 
+	dev_list = ''
 	mount_list = {}
 	for dev in disk_dev:
 		item = {}
 		if __salt__['file.is_blkdev'](dev):
 			dev_list += dev + ' '
-			mount_point = __salt__[shell_cmd]('mount | grep ' + dev + ' | cut -f 3 -d \' \'' ) 
+			mount_point = __salt__[shell_cmd]('mount | grep ' + dev + ' | cut -f 3 -d \' \'' )
 			mount_list[dev] = mount_point
 	if dev_list == '':
 		return False
 	result = __salt__['cmd.run']('/sbin/hdparm -t ' + dev_list , output_loglevel='debug')
 
-	result += "\n\ndd Write performance\n" 
+	result += "\n\ndd Write performance\n"
 	for dev, mount_point in mount_list.iteritems():
 		result += dev + '\n'
 		if not mount_point:
 			result += '/usr/bin/dd if=/dev/zero of=' + dev + ' conv=fdatasync bs=4K count=10000\n'
 			result += __salt__['cmd.run']('/usr/bin/dd if=/dev/zero of=' + dev + ' bs=4K count=10000 conv=fdatasync' , output_loglevel='debug')
 			result += '\n'
-		else: 
+		else:
 			result += '/usr/bin/dd if=/dev/zero of=' + mount_point + '/test conv=fdatasync bs=4K count=10000\n'
 			result += __salt__['cmd.run']('/usr/bin/dd if=/dev/zero of=' + mount_point + '/test bs=4K count=10000 conv=fdatasync' , output_loglevel='debug')
 			result += '\n'
@@ -879,12 +876,12 @@ def bench_disk( *disk_dev ):
 
 def bench_network( master_node, *client_node ):
 	'''
-	Run iperf from master_node and then call from all client_nodes 
+	Run iperf from master_node and then call from all client_nodes
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node*' ceph_sles.bench_network admin_node node1 node2 node3 ... 
+	salt 'node*' ceph_sles.bench_network admin_node node1 node2 node3 ...
 	'''
 
 	iperf_out = False
@@ -898,11 +895,11 @@ def bench_network( master_node, *client_node ):
 			if node == node_name:
 				iperf_out = __salt__['cmd.run']('/usr/bin/iperf3 -c ' + master_node + ' -d' , output_loglevel='debug')
 				break
-	return iperf_out 
+	return iperf_out
 
 def iperf( cpu_num, port_num, server ):
 	'''
-	Use async call to record iperf 100s to server with a specific CPU and port number 
+	Use async call to record iperf 100s to server with a specific CPU and port number
 
 	CLI Example:
 
@@ -927,7 +924,7 @@ def iperf( cpu_num, port_num, server ):
 
 def read_iperf( cpu_num, port_num, server ):
 	'''
-	Read all the output all and add the total together. 
+	Read all the output all and add the total together.
 
 	CLI Example:
 
@@ -942,7 +939,7 @@ def read_iperf( cpu_num, port_num, server ):
 	outfile = outpath + server + '.c' + str(cpu_num) + '.' + str(port_num) + '.iperf.dat'
 
 	result = __salt__[shell_cmd]('grep sender ' + outfile + '| grep 0.00-100.00', output_loglevel='debug')
-	
+
 	if result:
 		m = re.findall(r'(\d+\.?\d+) MBytes/sec', result)
 	if m[0]:
@@ -952,12 +949,12 @@ def read_iperf( cpu_num, port_num, server ):
 
 def bench_network_mcore( thread_num, master_node, *client_node ):
 	'''
-	Run iperf from master_node and then call from all client_nodes 
+	Run iperf from master_node and then call from all client_nodes
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'salt-master' ceph_sles.bench_network thread_number test_node client1 client2 client3 ... 
+	salt 'salt-master' ceph_sles.bench_network thread_number test_node client1 client2 client3 ...
 	'''
 
 	if len(client_node) < 1:
@@ -997,7 +994,7 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 		for i, node in enumerate( client_node ):
 			for x in range(0, thread_per_node ):
 				base = (i * thread_per_node) + x
-				tmp =  __salt__['cmd.run']('/usr/bin/salt "' + node + '" ceph_sles.read_iperf ' + str(x%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' ) 
+				tmp =  __salt__['cmd.run']('/usr/bin/salt "' + node + '" ceph_sles.read_iperf ' + str(x%core_num) + ' 53' + ("%02d"%(base+1,)) + ' ' +  master_node, output_loglevel='debug' )
 				m = re.match(r'.*Bandwidth:(\d+\.?\d+)', tmp,  re.DOTALL)
 				if m :
 					iperf_result.append( m.group(1) )
@@ -1012,12 +1009,12 @@ def bench_network_mcore( thread_num, master_node, *client_node ):
 
 def bench_test_ruleset( replication_size=3 ):
 	'''
-	Test all the new ruleset with utilization 
+	Test all the new ruleset with utilization
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node*' ceph_sles.bench_test_ruleset 2 
+	salt 'node*' ceph_sles.bench_test_ruleset 2
 	'''
 	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
 	new_bin_map = 'new_crushmap.bin'
@@ -1029,9 +1026,9 @@ def bench_test_ruleset( replication_size=3 ):
 def bench_rados():
 	'''
 	Test all the following pool type 1) SSD 2) HDD 3) MIX
-	Test replication size 2 and 3 
-	Test read type rand and seq 
-	Test all operation with thread count 1, CPU size, Max Core Thread total 
+	Test replication size 2 and 3
+	Test read type rand and seq
+	Test all operation with thread count 1, CPU size, Max Core Thread total
 
 	CLI Example:
 
@@ -1042,8 +1039,8 @@ def bench_rados():
 	bench_path = '/home/cephadmin/.ceph_sles_bench_report'
 	pool_names = ['ssd','hdd']
 	thread_counts = [1, 4, 16]
-	bench_time = 100	
-	
+	bench_time = 100
+
 
 	create_pool( 'ssd_pool_2', 64, 2, 'ssd_replicated' )
 	create_rbd = __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool ssd_pool_2')  + '\n'
@@ -1054,20 +1051,20 @@ def bench_rados():
 	create_rbd += __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool hdd_pool_2')  + '\n'
 	create_pool( 'hdd_pool_3', 64, 3, 'hdd_replicated' )
 	create_rbd += __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool hdd_pool_3')  + '\n'
-	
+
 
 	_bench_prep()
 
 	for pool in pool_names:
 		bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time*2) + ' write --no-cleanup', output_loglevel='debug' )
-		rep2_log = bench_path + '/' + pool + '_pool_2_write_default_nocleanup.log' 
+		rep2_log = bench_path + '/' + pool + '_pool_2_write_default_nocleanup.log'
 		logfile = open( rep2_log ,  "w" )
 		logfile.write( bench_result )
 		logfile.close()
 		os.chown(rep2_log, ceph_uid, 100)
 
 		bench3_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time*2) + ' write --no-cleanup', output_loglevel='debug' )
-		rep3_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log' 
+		rep3_log = bench_path + '/' + pool + '_pool_3_write_default_nocleanup.log'
 		logfile = open( rep3_log ,  "w" )
 		logfile.write( bench3_result )
 		logfile.close()
@@ -1075,28 +1072,28 @@ def bench_rados():
 
 		for thread in thread_counts:
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
-			rep2_log = bench_path + '/' + pool + '_pool_2_rand_thread_' + str(thread) + '.log' 
+			rep2_log = bench_path + '/' + pool + '_pool_2_rand_thread_' + str(thread) + '.log'
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
 			os.chown(rep2_log, ceph_uid, 100)
 
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' rand -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
-			rep3_log = bench_path + '/' + pool + '_pool_3_rand_thread_' + str(thread) + '.log' 
+			rep3_log = bench_path + '/' + pool + '_pool_3_rand_thread_' + str(thread) + '.log'
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
 			os.chown(rep3_log, ceph_uid, 100)
 
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
-			rep2_log = bench_path + '/' + pool + '_pool_2_seq_thread_' + str(thread) + '.log' 
+			rep2_log = bench_path + '/' + pool + '_pool_2_seq_thread_' + str(thread) + '.log'
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
 			os.chown(rep2_log, ceph_uid, 100)
 
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' seq -t ' + str(thread) + ' --no-cleanup', output_loglevel='debug' )
-			rep3_log = bench_path + '/' + pool + '_pool_3_seq_thread_' + str(thread) + '.log' 
+			rep3_log = bench_path + '/' + pool + '_pool_3_seq_thread_' + str(thread) + '.log'
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
@@ -1104,14 +1101,14 @@ def bench_rados():
 
 		for thread in thread_counts:
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_2 bench ' + str(bench_time) + ' write -t ' + str(thread), output_loglevel='debug' )
-			rep2_log = bench_path + '/' + pool + '_pool_2_write_thread_' + str(thread) + '.log' 
+			rep2_log = bench_path + '/' + pool + '_pool_2_write_thread_' + str(thread) + '.log'
 			logfile = open( rep2_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
 			os.chown(rep2_log, ceph_uid, 100)
 
 			bench_result = __salt__[shell_cmd]('rados -p ' + pool + '_pool_3 bench ' + str(bench_time) + ' write -t ' + str(thread), output_loglevel='debug' )
-			rep3_log = bench_path + '/' + pool + '_pool_3_write_thread_' + str(thread) + '.log' 
+			rep3_log = bench_path + '/' + pool + '_pool_3_write_thread_' + str(thread) + '.log'
 			logfile = open( rep3_log ,  "w" )
 			logfile.write( bench_result )
 			logfile.close()
@@ -1127,9 +1124,9 @@ def bench_rados():
 def bench_fio():
 	'''
 	Test all the following pool type with rbd 1) SSD 2) HDD 3) MIX
-	Test replication size 2 and 3 
-	Test read type rand and seq 
-	Test all operation with thread count 1, CPU size, Max Core Thread total 
+	Test replication size 2 and 3
+	Test read type rand and seq
+	Test all operation with thread count 1, CPU size, Max Core Thread total
 
 	CLI Example:
 
@@ -1139,8 +1136,8 @@ def bench_fio():
 	rbd_fio_name ='fio_test'
 	bench_path = '/home/cephadmin/.ceph_sles_bench_report'
 	pool_names = ['ssd','hdd','mix']
-	bench_time = 100	
-	
+	bench_time = 100
+
 	create_pool( 'ssd_pool_2', 64, 2, 'ssd_replicated' )
 	create_rbd = __salt__['cmd.run']('rbd create ' + rbd_fio_name + ' --size 2048 --pool ssd_pool_2')  + '\n'
 	create_pool( 'ssd_pool_3', 64, 3, 'ssd_replicated' )
@@ -1170,17 +1167,17 @@ def bench_fio():
 		logfile.close()
 		os.chown(fio2_log, ceph_uid, 100)
 
-		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
+		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=4K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' )
 
-		fio3_log = bench_path + '/' + pool + '_fio_4K_randwrite.log' 
+		fio3_log = bench_path + '/' + pool + '_fio_4K_randwrite.log'
 		logfile = open( fio3_log ,  "w" )
 		logfile.write( fio_result )
 		logfile.close()
 		os.chown(fio3_log, ceph_uid, 100)
 
-		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' ) 
+		fio_result = __salt__[shell_cmd]('fio --ioengine=rbd --rbdname=' + rbd_fio_name + ' --clientname=admin --iodepth=32 --direct=1 --rw=randwrite --bs=64K --runtime=300 --ramp_time=30 --name ' + pool + '_pool_3_test --group_reporting --pool=' + pool + '_pool_3', output_loglevel='debug' )
 
-		fio3_log = bench_path + '/' + pool + '_fio_64K_randwrite.log' 
+		fio3_log = bench_path + '/' + pool + '_fio_64K_randwrite.log'
 		logfile = open( fio3_log ,  "w" )
 		logfile.write( fio_result )
 		logfile.close()
@@ -1193,7 +1190,7 @@ def bench_fio():
 
 def clean_disk_partition( partlist=None):
 	'''
-	Remove disk partition table 
+	Remove disk partition table
 
 	CLI Example:
 
@@ -1216,7 +1213,7 @@ def clean_disk_partition( partlist=None):
 
 def clean_disk_partition_old( nodelist=None, partlist=None):
 	'''
-	Remove disk partition table 
+	Remove disk partition table
 
 	CLI Example:
 
@@ -1242,9 +1239,9 @@ def create_pool( pool_name, pg_num, replication_size, ruleset_name='replicated_r
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.create_pool ssd_pool_name 100<pg_num> 2<replicate> ruleset_name pooltype<default replicated> 
+	salt 'node1' ceph_sles.create_pool ssd_pool_name 100<pg_num> 2<replicate> ruleset_name pooltype<default replicated>
 	'''
-	create_pool = __salt__['cmd.run']('ceph osd pool create ' + pool_name + ' ' + str(pg_num) + ' ' + pool_type + ' ' + ruleset_name , 
+	create_pool = __salt__['cmd.run']('ceph osd pool create ' + pool_name + ' ' + str(pg_num) + ' ' + pool_type + ' ' + ruleset_name ,
 	output_loglevel='debug', cwd='/etc/ceph' )
 
 	create_pool += __salt__['cmd.run']('ceph osd pool set ' + pool_name + ' size ' + str(replication_size),
@@ -1254,16 +1251,16 @@ def create_pool( pool_name, pg_num, replication_size, ruleset_name='replicated_r
 	# output_loglevel='debug', runas=ceph_user, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 
 	return create_pool
-	
+
 
 def disk_info():
 	'''
-	Get all the disk device from nodes 
+	Get all the disk device from nodes
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.disk_info 
+	salt 'node1' ceph_sles.disk_info
         '''
 	result = __salt__[shell_cmd]('lsblk | grep ^sd*', output_loglevel='debug')
 	dev_names = re.findall( r'(?P<disk_name>sd.).*', result )
@@ -1273,10 +1270,10 @@ def disk_info():
 		cat_out = __salt__['cmd.run']('cat /sys/block/'+ dev_name +'/queue/rotational', output_loglevel='debug')
 		if cat_out[0] is "1":
 			hdd_list.append( dev_name )
-			result = re.sub(r'('+dev_name+'.*)disk', r'\1hdd disk', result) 
+			result = re.sub(r'('+dev_name+'.*)disk', r'\1hdd disk', result)
 		else:
 			ssd_list.append( dev_name )
-			result = re.sub(r'('+dev_name+'.*)disk', r'\1ssd disk', result) 
+			result = re.sub(r'('+dev_name+'.*)disk', r'\1ssd disk', result)
 	out_log = result
 	return out_log
 
@@ -1288,7 +1285,7 @@ def prep_osd_journal( partition_dev, part_size ):
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.prep_osd_journal /dev/sda 40G 
+	salt 'node1' ceph_sles.prep_osd_journal /dev/sda 40G
 
 	'''
 	journal_path = '/var/lib/ceph/osd/journal'
@@ -1301,7 +1298,7 @@ def prep_osd_journal( partition_dev, part_size ):
 	else:
 		_disk_format_xfs( partition_dev + str(new_part_num) )
 		new_part_label = _disk_part_label( partition_dev ) + str(new_part_num)
-		_fstab_add_part( new_part_label, journal_path ) 
+		_fstab_add_part( new_part_label, journal_path )
 
 	new_part_mount = __salt__['cmd.run']('mount '+ journal_path, output_loglevel='debug' )
 
@@ -1314,7 +1311,7 @@ def prep_osd_journal( partition_dev, part_size ):
 def prep_osd_ssd_journal( nodelist=None, partlist=None):
 
 	'''
-	Prepare all the osd and activate them 
+	Prepare all the osd and activate them
 
 	CLI Example:
 
@@ -1325,7 +1322,7 @@ def prep_osd_ssd_journal( nodelist=None, partlist=None):
 	return prep_osd( nodelist, partlist, journal_path)
 
 
-def prep_osd( nodelist=None, partlist=None, journal_path=None):
+def prep_osd(nodelist=None, partlist=None, journal_path=None):
     '''
     Prepare all the osd and activate them
     CLI Example:
@@ -1337,7 +1334,7 @@ def prep_osd( nodelist=None, partlist=None, journal_path=None):
     node_list = nodelist.split(",")
     part_list = partlist.split(",")
 
-    # check the biggest osd id is 
+    # check the biggest osd id is
     new_osd_id = __salt__[shell_cmd]('ceph osd ls | tail -n 1', output_loglevel='debug', env={'HOME':'/root'} )
 	if not new_osd_id:
         osd_num = 0
@@ -1360,19 +1357,19 @@ def prep_osd( nodelist=None, partlist=None, journal_path=None):
 
 def list_osd():
 	'''
-	List out all the osd is mounted and running 
+	List out all the osd is mounted and running
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.list_osd 
+	salt 'node1' ceph_sles.list_osd
 	'''
 	osd_list = _list_osd_files().split("\n")
 	mounted_osd = ""
 	file_list = ""
 
 	if osd_list[0] == "" :
-		return "There is file in osd default path, assume no OSD in this node." 
+		return "There is file in osd default path, assume no OSD in this node."
 	for osd in osd_list:
 		if osd:
 			mounted_osd += "\n" + __salt__[shell_cmd]('mount | grep ' + osd + '| cut -f 3 -d " "' , output_loglevel='debug')
@@ -1388,7 +1385,7 @@ def purge_osd( *osd_num ):
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node*' ceph_sles.purge_osd 0 1 2 3 
+	salt 'node*' ceph_sles.purge_osd 0 1 2 3
 	'''
 	prepare_active_lock = '/var/lib/ceph/tmp/ceph-disk.prepare.lock /var/lib/ceph/tmp/ceph-disk.activate.lock'
 	clean_log = ''
@@ -1410,17 +1407,17 @@ def purge_osd( *osd_num ):
 
 def remove_osd( *osd_num ):
 	'''
-	Remove osd from the cluster 
+	Remove osd from the cluster
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'node1' ceph_sles.remove_osd 0 1 2 3 
+	salt 'node1' ceph_sles.remove_osd 0 1 2 3
 
 	'''
 	ceph_conf = '/home/cephadmin/.ceph_sles_cluster_config'
 	admin_key = 'ceph.client.admin.keyring'
-	remove = "" 
+	remove = ""
 	for osd in osd_num:
 		remove += __salt__['cmd.run']('ceph osd down osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user, cwd=ceph_conf ) + '\n'
 		remove += __salt__['cmd.run']('ceph osd crush remove osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user, cwd=ceph_conf ) + '\n'
@@ -1438,7 +1435,7 @@ def remove_pool( pool_name ):
 	.. code-block:: bash
 	salt 'node1' ceph_sles.remove_pool pool_name
 	'''
-	return  __salt__['cmd.run']('ceph osd pool delete ' + pool_name + ' ' + pool_name + '  --yes-i-really-really-mean-it ', 
+	return  __salt__['cmd.run']('ceph osd pool delete ' + pool_name + ' ' + pool_name + '  --yes-i-really-really-mean-it ',
 	output_loglevel='debug', runas=ceph_user, cwd='/home/cephadmin/.ceph_sles_cluster_config' )
 
 def profile_node():
@@ -1463,18 +1460,18 @@ def _crushmap_disktype_output( disk_type, next_id, osd_weight_total, osd_weight_
 	Run the command from master-admin node to get all disk info and output
 	crushmap output with disktype being listed
 	'''
-	output = "disktype osd_" + disk_type + " {\n" 
+	output = "disktype osd_" + disk_type + " {\n"
 	output += "\tid " + str(next_id) + " # do not change unnecessarily\n"
-	output += "\t# weight " + str( osd_weight_total ) + "\n" 
-	output += "\talg straw\n\thash 0\n" 
+	output += "\t# weight " + str( osd_weight_total ) + "\n"
+	output += "\talg straw\n\thash 0\n"
 	output += osd_weight_line + "}"
 	return output
 
 def _crushmap_root_disktype_output( disk_type, next_id, osd_weight_total ):
-	output = "root root_" + disk_type + " {\n" 
+	output = "root root_" + disk_type + " {\n"
 	output += "\tid " + str(next_id) + " # do not change unnecessarily\n"
-	output += "\t# weight " + str( osd_weight_total ) + "\n" 
-	output += "\talg straw\n\thash 0\n" 
+	output += "\t# weight " + str( osd_weight_total ) + "\n"
+	output += "\talg straw\n\thash 0\n"
 	output += "\titem osd_" + disk_type + " weight " + str(osd_weight_total)
 	output += "\n}"
 	return output
@@ -1487,19 +1484,19 @@ def _osd_tree_obj():
 def _osd_tree_next_id( osd_tree_json_object ):
 	'''
 	Get the next id from the osd tree for crushmap update
-	it should be the next -1 id form the current lowest id 
+	it should be the next -1 id form the current lowest id
 	'''
-	next_id = 0 
+	next_id = 0
 	for child in osd_tree_json_object['nodes']:
 		if next_id > child['id']:
 			next_id = int( child['id'] )
-	next_id -= 1 
+	next_id -= 1
 	return next_id
 
 def _osd_tree_osd_weight( osd_tree_json_object, osd_num ):
 	'''
 	Get the osd weight from the osd tree json object for crushmap update by the osd.num
-	it should be the next -1 id form the current lowest id 
+	it should be the next -1 id form the current lowest id
 	'''
 	osd_weight = 0.0000
 	for child in osd_tree_json_object['nodes']:
@@ -1523,13 +1520,13 @@ def _parse_list_osd( list_osd_result, dev_name ):
 
 def _crushmap_add_hdd_ssd_tree( *node_names ):
 	'''
-	Run the command from master-admin node to get all ssd osd in the cluster 
-	and then put that into a crushmap format. 
+	Run the command from master-admin node to get all ssd osd in the cluster
+	and then put that into a crushmap format.
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'salt-master' ceph_sles.crushmap_add_hdd_ssd_tree node1 node2 node3 
+	salt 'salt-master' ceph_sles.crushmap_add_hdd_ssd_tree node1 node2 node3
 
 	'''
 	output = ""
@@ -1539,7 +1536,7 @@ def _crushmap_add_hdd_ssd_tree( *node_names ):
 	hdd_osd_weight_total = 0.000
 
 	tree_view_json = _osd_tree_obj()
-	next_id = _osd_tree_next_id( tree_view_json ) 
+	next_id = _osd_tree_next_id( tree_view_json )
 
 	for node in node_names:
 		disk_info_result =  __salt__['cmd.run']('salt "' + node + '" ceph_sles.disk_info', output_loglevel='debug' )
@@ -1548,33 +1545,33 @@ def _crushmap_add_hdd_ssd_tree( *node_names ):
 		if ssd_disks is not None:
 			for ssd_dev in ssd_disks:
 				osd_num_list = _parse_list_osd( list_osd_result, ssd_dev )
-				if osd_num_list is not None:	
+				if osd_num_list is not None:
 					for osd_num in osd_num_list:
-						weight  = _osd_tree_osd_weight( tree_view_json, osd_num ) 
+						weight  = _osd_tree_osd_weight( tree_view_json, osd_num )
 						ssd_osd_weight_total += weight
 						ssd_osd_weight_output += "\titem osd."+ str(osd_num) + " weight " + str( weight ) + "\n"
 		hdd_disks =  _parse_disktype( disk_info_result, 'hdd' )
 		if hdd_disks is not None:
 			for hdd_dev in hdd_disks:
 				osd_num_list = _parse_list_osd( list_osd_result, hdd_dev )
-				if osd_num_list is not None:	
+				if osd_num_list is not None:
 					for osd_num in osd_num_list:
 						#output += "osdnum :"+ osd_num+"\n"
-						weight  = _osd_tree_osd_weight( tree_view_json, osd_num ) 
+						weight  = _osd_tree_osd_weight( tree_view_json, osd_num )
 						hdd_osd_weight_total += weight
 						hdd_osd_weight_output += "\titem osd."+ str(osd_num) + " weight " + str( weight ) + "\n"
-						# output += " hdd=" + hdd_dev + " osd=osd." + str(osd_num) 
+						# output += " hdd=" + hdd_dev + " osd=osd." + str(osd_num)
 	crushmap_ssd_out = _crushmap_disktype_output( 'ssd', next_id, ssd_osd_weight_total, ssd_osd_weight_output )
-	output += crushmap_ssd_out 
+	output += crushmap_ssd_out
 	output += "\n\n"
 	crushmap_hdd_out = _crushmap_disktype_output( 'hdd', next_id-1, hdd_osd_weight_total, hdd_osd_weight_output )
 	output += crushmap_hdd_out
 	output += "\n\n"
 	crushmap_root_ssd_out = _crushmap_root_disktype_output( 'ssd', next_id-2, ssd_osd_weight_total )
-	output += crushmap_root_ssd_out 
+	output += crushmap_root_ssd_out
 	output += "\n\n"
 	crushmap_root_hdd_out = _crushmap_root_disktype_output( 'hdd', next_id-3, hdd_osd_weight_total )
-	output += crushmap_root_hdd_out 
+	output += crushmap_root_hdd_out
 	output += "\n\n"
 
 	return output
@@ -1599,7 +1596,7 @@ def _prepare_crushmap():
 
 def _read_crushmap_begin_section( begin_line, end_line ):
 	'''
-	Read the new_crushmap.txt and get the first section 
+	Read the new_crushmap.txt and get the first section
 	from line e.g. "# begin crush map" to "# devices"
 	'''
 	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
@@ -1619,18 +1616,18 @@ def _read_crushmap_begin_section( begin_line, end_line ):
 
 def _remove_crushmap_bucket_update( bucket_section ):
 	'''
-	Read the old crushmap and get the bucket section and remove 
-	saltstack update disktype osd_ssd {}, disktype osd_hdd {} 
-	and root root_ssd {}, root root_hdd {} 
+	Read the old crushmap and get the bucket section and remove
+	saltstack update disktype osd_ssd {}, disktype osd_hdd {}
+	and root root_ssd {}, root root_hdd {}
 	'''
 	# keep that in 2 states 'keep', 'remove', 'remove-end'
-	state = 'keep' 
+	state = 'keep'
 	output = ""
 	section = StringIO.StringIO( bucket_section )
 	for line in section:
 		if line.startswith( 'disktype osd_ssd' ) or line.startswith( 'disktype osd_hdd' ) or \
 		line.startswith( 'root root_ssd' ) or line.startswith( 'root root_ssd' ):
-			state = 'remove' 
+			state = 'remove'
 		if line.startswith( '}' ):
 			if( state == 'remove' ):
 				state = 'remove-end'
@@ -1653,7 +1650,7 @@ def _read_crushmap_has_ruleset_update( ruleset_section ):
 
 def _update_crushmap():
 	'''
-	Compile and install the new crushmap into the cluster 
+	Compile and install the new crushmap into the cluster
 	'''
 	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
 	new_txt_map = 'new_crushmap.txt'
@@ -1667,7 +1664,7 @@ def _update_crushmap():
 
 def _crushmap_add_disktype():
 	'''
-	Update types section as following : 
+	Update types section as following :
 	'''
 	new_type = '# types\n'
 	new_type += 'type 0 osd\n'
@@ -1707,18 +1704,18 @@ def _crushmap_add_ssd_hdd_ruleset( rule_type, next_ruleset_id, min_size, max_siz
 	hdd_ruleset += '\tstep chooseleaf firstn 0 type osd\n'
 	hdd_ruleset += '\tstep emit\n'
 	hdd_ruleset += '}\n'
-	
+
 	return ssd_ruleset + hdd_ruleset
 
 def _read_ruleset_next_id( all_ruleset ):
 	'''
-	Return the max + 1 ruleset id form the crushmap line buffer 
+	Return the max + 1 ruleset id form the crushmap line buffer
 	'''
 	next_id = 0
 	all_id = re.findall( r'ruleset (?P<id>\d).*', all_ruleset )
 	for rule_id in all_id:
 		if int(rule_id) > next_id:
-			next_id = int( rule_id ) 
+			next_id = int( rule_id )
 	return next_id + 1
 
 
@@ -1729,12 +1726,12 @@ def crushmap_update_disktype_ssd_hdd( *node_names ):
 	Run the command from master-admin node
 	1) Prepare crushmap in /home/cephadmin/.ceph_sles_cluster_config/crushmap
 	2) Add disktype to default crushmap
-	3) Find all node ssd and hdd and group them into root_sdd and root_hdd 
+	3) Find all node ssd and hdd and group them into root_sdd and root_hdd
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'salt-master' ceph_sles.crushmap_update_disktype_ssd_hdd node1 node2 node3 
+	salt 'salt-master' ceph_sles.crushmap_update_disktype_ssd_hdd node1 node2 node3
 
 	'''
 	crushmap_path = '/home/cephadmin/.ceph_sles_cluster_config/crushmap'
@@ -1745,37 +1742,37 @@ def crushmap_update_disktype_ssd_hdd( *node_names ):
 	bucket_line = '# buckets'
 	rule_line = '# rules'
 	end_line = '# end crush map'
-	
-	# prepare the file of crushmap from the running cluster 
+
+	# prepare the file of crushmap from the running cluster
 	output = _prepare_crushmap()
-	# get the first section of the crushmap text file 
+	# get the first section of the crushmap text file
 	before_type = _read_crushmap_begin_section( begin_line, type_line )
 	# add the disktype into the crushmap type list
 	new_type = _crushmap_add_disktype()
 	# get the bucket section until the ruleset
 	bucket_list = _read_crushmap_begin_section( bucket_line, rule_line )
-	# remove if the bucket list has been updated before 
+	# remove if the bucket list has been updated before
 	bucket_list = _remove_crushmap_bucket_update( bucket_list )
-	# add the pure ssd and pure hdd bucket 
+	# add the pure ssd and pure hdd bucket
 	bucket_ssd_hdd = _crushmap_add_hdd_ssd_tree( *node_names )
 	# get the ruleset of the curshmap
 	ruleset_list = _read_crushmap_begin_section( rule_line, end_line )
-	
-	# if the rule list has been updated before leave it alone 
+
+	# if the rule list has been updated before leave it alone
 	if not _read_crushmap_has_ruleset_update( ruleset_list ):
-		# get the highest number of ruleset id + 1 
+		# get the highest number of ruleset id + 1
 		next_ruleset_id = _read_ruleset_next_id( ruleset_list )
-		# let's fix this later, I'm sure there is better way to setup min and max 
+		# let's fix this later, I'm sure there is better way to setup min and max
 		min_size = 1
-		max_size = 3 
-		# add the ssd and hdd replicated ruleset 
+		max_size = 3
+		# add the ssd and hdd replicated ruleset
 		ruleset_list += _crushmap_add_ssd_hdd_ruleset( 'replicated', next_ruleset_id, min_size, max_size )
 		ruleset_list += _crushmap_add_ssd_hdd_ruleset( 'erasure', next_ruleset_id+2, min_size, max_size )
 
 	ruleset_list += '\n' + end_line + '\n'
 
 	new_crushmap = before_type + new_type + bucket_list + bucket_ssd_hdd + ruleset_list
-	new_crushmap_file = open( crushmap_path + '/' + new_txt_map, "w" ) 
+	new_crushmap_file = open( crushmap_path + '/' + new_txt_map, "w" )
 	new_crushmap_file.write( new_crushmap )
 	new_crushmap_file.close()
 
@@ -1810,7 +1807,7 @@ def _radosgw_create_pool():
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'salt-master' ceph_sles.radosgw_create_pool 
+	salt 'salt-master' ceph_sles.radosgw_create_pool
 	'''
 	output = create_pool( '.intent-log', 32, 2, 'hdd_replicated' )
 	output += create_pool( '.log', 128, 2, 'hdd_replicated' )
@@ -1865,9 +1862,9 @@ def _radosgw_config_update( gateway_node ):
 	conf_out += 'host = ' + gateway_node + '\n'
 	conf_out += 'keyring = ' + ceph_conf_dir + '/' + radosgw_keyring + '\n'
 	conf_out += 'rgw_socket_path = ' + radosgw_var_run_dir + '/' + radosgw_sock + '\n'
-	conf_out += 'admin_socket = ' + radosgw_var_run_dir + '/' + radosgw_admin_sock + '\n' 
+	conf_out += 'admin_socket = ' + radosgw_var_run_dir + '/' + radosgw_admin_sock + '\n'
 	conf_out += 'log_file = ' + radosgw_var_log_dir + '/' + radosgw_log + '\n'
-	conf_out += 'rgw_frontends = civetweb port=80\n' 
+	conf_out += 'rgw_frontends = civetweb port=80\n'
 
 
 	return conf_out
@@ -1895,7 +1892,7 @@ def _rewrite_conf_gateway( gateway_node ):
 	old_conf += '\n'
 	new_conf = _radosgw_config_update( gateway_node )
 
-	new_conf_file = open( ceph_config_path + '/' + ceph_conf , "w" ) 
+	new_conf_file = open( ceph_config_path + '/' + ceph_conf , "w" )
 	new_conf_file.write( old_conf )
 	new_conf_file.write( new_conf )
 	new_conf_file.close()
@@ -1916,8 +1913,8 @@ def create_rados_gateway( gateway_node ):
 	out += _radosgw_keygen( gateway_node )
 	out += _rewrite_conf_gateway( gateway_node )
 	out += push_conf( gateway_node )
-	out += '\nEnabling radosgw service '+ gateway_node + ':\n' 
-	out += '\nradosgw version : '+ __salt__['pkg.version']('ceph-radosgw') + ':\n' 
+	out += '\nEnabling radosgw service '+ gateway_node + ':\n'
+	out += '\nradosgw version : '+ __salt__['pkg.version']('ceph-radosgw') + ':\n'
 	#if pkg.version('ceph-radosgw',False) < '10.2':
 	if '10.2' in __salt__['pkg.version']('ceph-radosgw'):
 		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph-radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
@@ -1925,17 +1922,17 @@ def create_rados_gateway( gateway_node ):
 	else:
 		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.enable ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
 		out += __salt__['cmd.run']('salt "' + gateway_node + '" service.start ceph.radosgw@'+gateway_node, output_loglevel='debug' ) + '\n'
-	
+
 	return out
 
 def create_cache_tier( pool_name ):
 	'''
-	Create two pool ssd in front of the hdd to create cache tier 
+	Create two pool ssd in front of the hdd to create cache tier
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'salt-master' ceph_sles.create_cache_tier Pool_Name 
+	salt 'salt-master' ceph_sles.create_cache_tier Pool_Name
 	'''
 	out = create_pool( pool_name + "_write_cache",  64,  2,  "ssd_replicated" )  + '\n'
 	out = create_pool( pool_name + "_read_cache",  64,  2,  "ssd_replicated" )  + '\n'
@@ -1957,12 +1954,12 @@ def create_cache_tier( pool_name ):
 
 def remove_cache_tier( pool_name ):
 	'''
-	remove two read write pool in front of the hdd 
+	remove two read write pool in front of the hdd
 
 	CLI Example:
 
 	.. code-block:: bash
-	salt 'salt-master' ceph_sles.remove_cache_tier Pool_Name 
+	salt 'salt-master' ceph_sles.remove_cache_tier Pool_Name
 	'''
 	out = __salt__['cmd.run']('ceph osd tier cache-mode ' + pool_name + '_read_cache none' , output_loglevel='debug' ) + '\n'
 	out += __salt__['cmd.run']('ceph osd tier remove ' + pool_name + ' ' + pool_name + '_read_cache ' , output_loglevel='debug' ) + '\n'
@@ -1977,7 +1974,7 @@ def remove_cache_tier( pool_name ):
 
 def new_mds():
 	'''
-        Create new mds servers 
+        Create new mds servers
 
 	CLI Example:
 
