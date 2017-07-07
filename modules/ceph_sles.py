@@ -841,7 +841,7 @@ def push_key(*node_names):
             out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + osd_bs_key + ' ' + osd_bs_key, output_loglevel='debug') + '\n'
         if salt_utils.istextfile(rgw_bs_key):
             out_log += __salt__['cmd.run']('salt-cp "' + node + '" ' + rgw_bs_key + ' ' + rgw_bs_key, output_loglevel='debug') + '\n'
-        return out_log
+    return out_log
 
 
 def bench_disk(*disk_dev):
