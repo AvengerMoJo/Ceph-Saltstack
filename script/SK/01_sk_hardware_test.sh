@@ -24,8 +24,8 @@ sudo salt "node*" ceph_sles.clean_disk_partition "/dev/sdm,/dev/sdn,/dev/sdo,/de
 
 # create bcache 
 
-parted -s -a optimal /dev/nvme0n1 mkpart primary 0G 350G
-parted -s -a optimal /dev/nvme1n1 mkpart primary 0G 350G
+sudo salt "node*" cmd.run "parted -s -a optimal /dev/nvme0n1 mkpart primary 0G 350G"
+sudo salt "node*" cmd.run "parted -s -a optimal /dev/nvme1n1 mkpart primary 0G 350G"
 
 salt "node*" ceph_sles.make_bcache /dev/nvme0n1p1 /dev/sdb /dev/sdc /dev/sdd /dev/sde /dev/sdf /dev/sdg /dev/sdh /dev/sdi /dev/sdj /dev/sdk /dev/sdl
 
@@ -38,6 +38,7 @@ for i in `seq 12 22`; do echo writeback > /sys/block/bcache$i/bcache/cache_mode;
 for i in `seq 12 22`; do echo 512k > /sys/block/bcache$i/bcache/sequential_cutoff; done
 for i in `seq 12 22`; do echo 40 > /sys/block/bcache$i/bcache/writeback_percent; done
 
+#deepsea state run state.2 
 echo "policy.cfg get to be send" 
 echo "cp node1.yml /srv/pillar/ceph/proposals/profile-default/stack/default/ceph/minions/*" 
 echo "cp node2.yml /srv/pillar/ceph/proposals/profile-default/stack/default/ceph/minions/*" 
@@ -48,6 +49,9 @@ echo "cp node5.yml /srv/pillar/ceph/proposals/profile-default/stack/default/ceph
 # load empty node.yml 
 echo "Make sure db size is set in conf?" 
 # ceph-conf --show-config | grep bluestore |grep size  |grep wal
+#deepsea state run state.3 
+
+sudo salt "node*" ceph_sles.clean_disk_partition "/dev/bcache0,/dev/bcache1,/dev/bcache2,/dev/bcache3,/dev/bcache4"
 
 # create ceph-disk prepare with bcache by script 
 NVME=nvme0n1
@@ -68,6 +72,14 @@ for i in `seq 12 22`; do
     ceph osd crush rm-device-class osd.$i
     ceph osd crush set-device-class HPE-hdd osd.$i
 done
+
+ceph osd getcrushmap -o orig_map.bin
+crushtool -d orig_map.bin -o orig_map.txt
+cp orig_map.txt new_map.txt
+# edit the new_map by hand 
+crushtool -c new_map.txt -o new_map.bin
+ceph osd setcrushmap -i new_map.bin
+
 
 # update configuration Tunning / auth / debug  off 
 
