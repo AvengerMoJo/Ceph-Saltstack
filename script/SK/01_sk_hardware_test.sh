@@ -29,12 +29,12 @@ sudo salt "node*" cmd.run "parted -s -a optimal /dev/nvme1n1 mkpart primary 0G 3
 
 salt "node*" ceph_sles.make_bcache /dev/nvme0n1p1 /dev/sdb /dev/sdc /dev/sdd /dev/sde /dev/sdf /dev/sdg /dev/sdh /dev/sdi /dev/sdj /dev/sdk /dev/sdl
 
-for i in `seq 0 11`; do echo writeback > /sys/block/bcache$i/bcache/cache_mode; done
+for i in `seq 0 11`; do echo writearound > /sys/block/bcache$i/bcache/cache_mode; done
 for i in `seq 0 11`; do echo 512k > /sys/block/bcache$i/bcache/sequential_cutoff; done
 for i in `seq 0 11`; do echo 40 > /sys/block/bcache$i/bcache/writeback_percent; done
 
 salt "node*" ceph_sles.make_bcache /dev/nvme1n1p1 /dev/sdm /dev/sdn /dev/sdo /dev/sdp /dev/sdq /dev/sdr /dev/sds /dev/sdt /dev/sdu /dev/sdv /dev/sdw 
-for i in `seq 12 22`; do echo writeback > /sys/block/bcache$i/bcache/cache_mode; done
+for i in `seq 12 22`; do echo writearound > /sys/block/bcache$i/bcache/cache_mode; done
 for i in `seq 12 22`; do echo 512k > /sys/block/bcache$i/bcache/sequential_cutoff; done
 for i in `seq 12 22`; do echo 40 > /sys/block/bcache$i/bcache/writeback_percent; done
 
@@ -80,8 +80,9 @@ cp orig_map.txt new_map.txt
 crushtool -c new_map.txt -o new_map.bin
 ceph osd setcrushmap -i new_map.bin
 
-
 # update configuration Tunning / auth / debug  off 
+
+ceph test osd.0 bench 
 
 
 echo "copy and update ceph.conf remove auto and debug  "  
