@@ -36,6 +36,10 @@ salt "node*" ceph_sles.make_bcache /dev/nvme0n1p1 /dev/sdb /dev/sdc /dev/sdd /de
 
 salt "node*" cmd.run "ls /sys/fs/bcache/"
 
+# UUID=4e678773-5024-3bad-9e0f-aa9390733db2
+# salt "node*" cmd.run "echo 0 > /sys/fs/bcache/${UUID}/congested_read_threshold_us"
+# salt "node*" cmd.run "echo 0 > /sys/fs/bcache/${UUID}/congested_write_threshold_us"
+
 for i in `seq 0 11`; do echo writearound > /sys/block/bcache$i/bcache/cache_mode; done
 for i in `seq 0 11`; do echo 512k > /sys/block/bcache$i/bcache/sequential_cutoff; done
 for i in `seq 0 11`; do echo 40 > /sys/block/bcache$i/bcache/writeback_percent; done
