@@ -12,6 +12,7 @@ import os
 import re
 import socket
 import time
+import uuid
 # import getopt
 import json
 import fileinput
@@ -1438,6 +1439,62 @@ def remove_osd(*osd_num):
         remove += __salt__['cmd.run']('ceph osd crush remove osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user, cwd=ceph_conf) + '\n'
         remove += __salt__['cmd.run']('ceph auth del osd.'+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user, cwd=ceph_conf) + '\n'
         remove += __salt__['cmd.run']('ceph osd rm '+ str(osd) + ' -k ' + admin_key, output_loglevel='debug', runas=ceph_user, cwd=ceph_conf) + '\n'
+
+    return remove
+
+def make_bcache(nvme, *hdd_list):
+    '''
+    create bcache with the NVMe partition register all the list of hard drive with it.
+
+    CLI Example:
+
+    .. code-block:: bash
+    salt 'node*' ceph_sles.make_bcache NVM_Partition /dev/hdb /dev/hdc
+    '''
+    nvme_uuid = str(uuid.uuid3(uuid.NAMESPACE_OID, nvme))
+    make_log = ""
+    make_log += __salt__['cmd.run']('mkfs.xfs ' + nvme,  output_loglevel='debug') + '\n'
+    make_log += __salt__['cmd.run']('wipefs -a ' + nvme, output_loglevel='debug') + '\n'
+    make_log += __salt__[shell_cmd]('make-bcache -B ' + " ".join(hdd_list) + ' -C ' + nvme
+                                  + ' --cset-uuid ' + nvme_uuid, output_loglevel='debug') + '\n'
+    time.sleep(1) # delay for a sec
+    make_log += __salt__[shell_cmd]('echo 0 > /sys/fs/bcache/' + nvme_uuid + '/congested_read_threshold_us', output_loglevel='debug') + '\n'
+    make_log += __salt__[shell_cmd]('echo 0 > /sys/fs/bcache/' + nvme_uuid + '/congested_write_threshold_us', output_loglevel='debug') + '\n'
+    return make_log
+
+def bcache_clean_header(*hdd_list):
+    '''
+    remove bcache hdd header before reuse it again
+
+    CLI Example:
+
+    .. code-block:: bash
+    salt 'node*' ceph_sles.bcache_clean_header /dev/hdb /dev/hdc
+    '''
+    remove = ""
+    for hdd in hdd_list:
+        remove += "wiping hdd " + hdd
+        remove += __salt__['cmd.run']('wipefs -a ' + hdd, output_loglevel='debug') + '\n'
+    return remove
+
+def remove_bcache(nvme, *bcache_num):
+    '''
+    Stop bcache and unregister all drive with it.
+
+    CLI Example:
+
+    .. code-block:: bash
+    salt 'node1' ceph_sles.remove_bcache 0 1 2 3
+
+    '''
+    nvme_uuid = uuid.uuid3(uuid.NAMESPACE_OID, nvme)
+    remove = ""
+    for bcache in bcache_num:
+        remove += __salt__[shell_cmd]('echo 1> /sys/block/bcache' + str(bcache) + '/bcache/stop', output_loglevel='debug') + '\n'
+    time.sleep(1) # delay for a sec
+    remove += __salt__[shell_cmd]('echo 1> /sys/fs/bcache/' + str(nvme_uuid) + '/stop', output_loglevel='debug') + '\n'
+    time.sleep(1) # delay for a sec
+    remove += __salt__[shell_cmd]('wipefs -a ' + nvme, output_loglevel='debug') + '\n'
 
     return remove
 
