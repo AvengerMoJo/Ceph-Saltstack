@@ -778,7 +778,8 @@ def purge_mon():
     keyring_files = '/var/lib/ceph/bootstrap-mds/ceph.keyring '
     keyring_files += '/var/lib/ceph/bootstrap-osd/ceph.keyring '
     keyring_files += '/var/lib/ceph/bootstrap-rgw/ceph.keyring'
-    output = str(__salt__['service.stop']('ceph-mon@'+node))
+    output = str(__salt__['service.stop']('ceph-mgr@'+node))
+    output += str(__salt__['service.stop']('ceph-mon@'+node))
     output += __salt__[shell_cmd]('rm -rf ' + mon_dir + '/')
     output += __salt__[shell_cmd]('rm -rf ' + keyring_files)
     output += __salt__[shell_cmd]('rm -rf ' + ceph_conf_dir)
