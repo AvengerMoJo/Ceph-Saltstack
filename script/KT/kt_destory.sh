@@ -14,3 +14,11 @@ salt "*" ceph_sles.purge_mon
 salt "*" ceph_sles.remove_bcache /dev/sda1 /dev/vda /dev/vdb /dev/vdc /dev/vdd /dev/vdf
 salt "*" ceph_sles.bcache_clean_header /dev/sda /dev/vda /dev/vdb /dev/vdc /dev/vdd /dev/vdf
 
+salt "*" cmd.run "ls /sys/fs/bcache/" 
+salt "*" cmd.run "ls /sys/block/" 
+salt "*" cmd.run "lsblk"
+
+# salt "*" cmd.run "ls /sys/block/vda" 
+# after clean if bcache
+# echo 1 > /sys/block/vda/bcache/stop 
+

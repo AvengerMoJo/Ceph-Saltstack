@@ -18,8 +18,13 @@ sudo salt-run net.iperf exclude="not G@deepsea:default"
 sudo salt 'node*' ceph_sles.bench_disk /dev/sdb /dev/sdc /dev/sdd /dev/sde /dev/sdf /dev/sdg /dev/sdh /dev/sdi /dev/sdj /dev/sdk /dev/sdl
 sudo salt "node*" ceph_sles.bench_disk /dev/sdm /dev/sdn /dev/sdo /dev/sdp /dev/sdq /dev/sdr /dev/sds /dev/sdt /dev/sdu /dev/sdv /dev/sdw
 
-# zap disk 
+# zap disk  run it twice 
 sudo salt 'node*' ceph_sles.clean_disk_partition "/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde,/dev/sdf,/dev/sdg,/dev/sdh,/dev/sdi,/dev/sdj,/dev/sdk,/dev/sdl"
+sleep 1
+sudo salt 'node*' ceph_sles.clean_disk_partition "/dev/sdb,/dev/sdc,/dev/sdd,/dev/sde,/dev/sdf,/dev/sdg,/dev/sdh,/dev/sdi,/dev/sdj,/dev/sdk,/dev/sdl"
+
+sudo salt "node*" ceph_sles.clean_disk_partition "/dev/sdm,/dev/sdn,/dev/sdo,/dev/sdp,/dev/sdq,/dev/sdr,/dev/sds,/dev/sdt,/dev/sdu,/dev/sdv,/dev/sdw"
+sleep 1
 sudo salt "node*" ceph_sles.clean_disk_partition "/dev/sdm,/dev/sdn,/dev/sdo,/dev/sdp,/dev/sdq,/dev/sdr,/dev/sds,/dev/sdt,/dev/sdu,/dev/sdv,/dev/sdw"
 
 # create bcache 
@@ -28,6 +33,8 @@ sudo salt "node*" cmd.run "parted -s -a optimal /dev/nvme0n1 mkpart primary 0G 3
 sudo salt "node*" cmd.run "parted -s -a optimal /dev/nvme1n1 mkpart primary 0G 350G"
 
 salt "node*" ceph_sles.make_bcache /dev/nvme0n1p1 /dev/sdb /dev/sdc /dev/sdd /dev/sde /dev/sdf /dev/sdg /dev/sdh /dev/sdi /dev/sdj /dev/sdk /dev/sdl
+
+salt "node*" cmd.run "ls /sys/fs/bcache/"
 
 for i in `seq 0 11`; do echo writearound > /sys/block/bcache$i/bcache/cache_mode; done
 for i in `seq 0 11`; do echo 512k > /sys/block/bcache$i/bcache/sequential_cutoff; done
