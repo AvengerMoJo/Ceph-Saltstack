@@ -1458,7 +1458,7 @@ def make_bcache(nvme, *hdd_list):
     make_log += __salt__['cmd.run']('wipefs -a ' + nvme, output_loglevel='debug') + '\n'
     make_log += __salt__[shell_cmd]('make-bcache -B ' + " ".join(hdd_list) + ' -C ' + nvme
                                   + ' --cset-uuid ' + nvme_uuid, output_loglevel='debug') + '\n'
-    time.sleep(1) # delay for a sec
+    time.sleep(5) # delay for a sec
     make_log += __salt__[shell_cmd]('echo 0 > /sys/fs/bcache/' + nvme_uuid + '/congested_read_threshold_us', output_loglevel='debug') + '\n'
     make_log += __salt__[shell_cmd]('echo 0 > /sys/fs/bcache/' + nvme_uuid + '/congested_write_threshold_us', output_loglevel='debug') + '\n'
     return make_log

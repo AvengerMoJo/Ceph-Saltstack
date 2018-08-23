@@ -7,7 +7,6 @@ OSDs4=" 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 "
 OSDs5=" 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 "
 
 salt "*" ceph_sles.purge_osd $OSDs1
-
 salt "*" ceph_sles.remove_osd $OSDs1
 salt "*" ceph_sles.purge_mon
 
@@ -22,3 +21,13 @@ salt "*" cmd.run "lsblk"
 # after clean if bcache
 # echo 1 > /sys/block/vda/bcache/stop 
 
+
+# remove only 1 bcache osd 
+# remove it from Deepsea 
+# salt-run disengage.safety; 
+# salt-run remove.osd number 
+
+salt "node" ceph_sles.purge_osd  <number>
+salt "node" ceph_sles.remove_osd <number>
+salt "node" cmd.run "echo 1 > /sys/block/<bcache_block_name>/bcache/stop" 
+salt "node" ceph_sles.bcache_clean_header <dev_name> 
