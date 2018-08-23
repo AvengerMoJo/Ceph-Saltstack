@@ -1,0 +1,339 @@
+# begin crush map
+tunable choose_local_tries 0
+tunable choose_local_fallback_tries 0
+tunable choose_total_tries 50
+tunable chooseleaf_descend_once 1
+tunable chooseleaf_vary_r 1
+tunable chooseleaf_stable 1
+tunable straw_calc_version 1
+tunable allowed_bucket_algs 54
+
+# devices
+device 0 osd.0 class HPE-hdd
+device 1 osd.1 class HPE-hdd
+device 2 osd.2 class HPE-hdd
+device 3 osd.3 class HPE-hdd
+device 4 osd.4 class HPE-hdd
+device 5 osd.5 class HPE-hdd
+device 6 osd.6 class HPE-hdd
+device 7 osd.7 class HPE-hdd
+device 8 osd.8 class HPE-hdd
+device 9 osd.9 class HPE-hdd
+device 10 osd.10 class HPE-hdd
+device 11 osd.11 class HPE-hdd
+device 12 osd.12 class HPE-hdd
+device 13 osd.13 class HPE-hdd
+device 14 osd.14 class HPE-hdd
+device 15 osd.15 class HPE-hdd
+device 16 osd.16 class HPE-hdd
+device 17 osd.17 class HPE-hdd
+device 18 osd.18 class HPE-hdd
+device 19 osd.19 class HPE-hdd
+
+# types
+type 0 osd
+type 1 host
+type 2 chassis
+type 3 rack
+type 4 row
+type 5 pdu
+type 6 pod
+type 7 room
+type 8 datacenter
+type 9 region
+type 10 root
+
+# buckets
+host node2 {
+	id -3		# do not change unnecessarily
+	id -11 class HPE-hdd		# do not change unnecessarily
+	# weight 0.097
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.0 weight 0.019
+	item osd.1 weight 0.019
+	item osd.2 weight 0.019
+	item osd.3 weight 0.019
+	item osd.4 weight 0.019
+}
+host node3 {
+	id -5		# do not change unnecessarily
+	id -12 class HPE-hdd		# do not change unnecessarily
+	# weight 0.097
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.6 weight 0.019
+	item osd.7 weight 0.019
+	item osd.8 weight 0.019
+	item osd.5 weight 0.019
+	item osd.10 weight 0.019
+}
+host node4 {
+	id -7		# do not change unnecessarily
+	id -13 class HPE-hdd		# do not change unnecessarily
+	# weight 0.097
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.9 weight 0.019
+	item osd.11 weight 0.019
+	item osd.13 weight 0.019
+	item osd.14 weight 0.019
+	item osd.12 weight 0.019
+}
+host node1 {
+	id -9		# do not change unnecessarily
+	id -14 class HPE-hdd		# do not change unnecessarily
+	# weight 0.097
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.16 weight 0.019
+	item osd.15 weight 0.019
+	item osd.17 weight 0.019
+	item osd.18 weight 0.019
+	item osd.19 weight 0.019
+}
+host r1_node1 {
+	id -20
+	id -45 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.0 weight 0.019
+}
+host r1_node2 {
+	id -21
+	id -46 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.5 weight 0.019
+}
+host r1_node3 {
+	id -22
+	id -47 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.9 weight 0.019
+}
+host r1_node4 {
+	id -23
+	id -48 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.15 weight 0.019
+}
+chassis hpe_range1 { 
+	id -17
+	id -41 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item r1_node1 weight 0.019
+	item r1_node2 weight 0.019
+	item r1_node3 weight 0.019
+	item r1_node4 weight 0.019
+}
+host r2_node1 {
+	id -24
+	id -49 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.1 weight 0.019
+}
+host r2_node2 {
+	id -25
+	id -50 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.6 weight 0.019
+}
+host r2_node3 {
+	id -26
+	id -51 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.11 weight 0.019
+}
+host r2_node4 {
+	id -27
+	id -52 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.16 weight 0.019
+}
+chassis hpe_range2 { 
+	id -66
+	id -42 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item r2_node1 weight 0.019
+	item r2_node2 weight 0.019
+	item r2_node3 weight 0.019
+	item r2_node4 weight 0.019
+}
+host r3_node1 {
+	id -28
+	id -53 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.2 weight 0.019
+}
+
+host r3_node2 {
+	id -29
+	id -54 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.7 weight 0.019
+}
+
+host r3_node3 {
+	id -30
+	id -55 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.12 weight 0.019
+}
+
+host r3_node4 {
+	id -31
+	id -56 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.17 weight 0.019
+}
+chassis hpe_range3 { 
+	id -19
+	id -43 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item r3_node1 weight 0.019
+	item r3_node2 weight 0.019
+	item r3_node3 weight 0.019
+	item r3_node4 weight 0.019
+}
+host r4_node1 {
+	id -32
+	id -57 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.3 weight 0.019
+}
+
+host r4_node2 {
+	id -33
+	id -58 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.8 weight 0.019
+}
+
+host r4_node3 {
+	id -34
+	id -59 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.13 weight 0.019
+}
+
+host r4_node4 {
+	id -35
+	id -60 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.18 weight 0.019
+}
+chassis hpe_range4 { 
+	id -18
+	id -44 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item r4_node1 weight 0.019
+	item r4_node2 weight 0.019
+	item r4_node3 weight 0.019
+	item r4_node4 weight 0.019
+}
+host r5_node1 {
+	id -37
+	id -61 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.4 weight 0.019
+}
+
+host r5_node2 {
+	id -38
+	id -62 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.9 weight 0.019
+}
+
+host r5_node3 {
+	id -39
+	id -63 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.14 weight 0.019
+}
+
+host r5_node4 {
+	id -40
+	id -64 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item osd.19 weight 0.019
+}
+chassis hpe_range5 { 
+	id -36
+	id -45 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item r5_node1 weight 0.019
+	item r5_node2 weight 0.019
+	item r5_node3 weight 0.019
+	item r5_node4 weight 0.019
+}
+root root_hpe { 
+	id -16
+	id -41 class HPE-hdd		# do not change unnecessarily
+	alg straw2
+	hash 0	# rjenkins1
+	item hpe_range1 weight 0.075
+	item hpe_range2 weight 0.075
+	item hpe_range3 weight 0.075
+	item hpe_range4 weight 0.075
+	item hpe_range5 weight 0.075
+}
+root default {
+	id -1		# do not change unnecessarily
+	id -15 class HPE-hdd		# do not change unnecessarily
+	# weight 0.388
+	alg straw2
+	hash 0	# rjenkins1
+	item node2 weight 0.097
+	item node3 weight 0.097
+	item node4 weight 0.097
+	item node1 weight 0.097
+}
+
+# rules
+rule replicated_rule {
+	id 0
+	type replicated
+	min_size 1
+	max_size 10
+	step take default
+	step chooseleaf firstn 0 type host
+	step emit
+}
+
+rule hpe_rule {
+	id 1 
+	type replicated 
+	min_size 1
+	max_size 10 
+	step take root_hpe
+	step chooseleaf firstn 0 type chassis
+	step chooseleaf firstn 0 type host
+	step emit
+}
+
+# end crush map
