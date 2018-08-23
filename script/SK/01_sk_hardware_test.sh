@@ -48,7 +48,12 @@ echo "cp node5.yml /srv/pillar/ceph/proposals/profile-default/stack/default/ceph
 
 # load empty node.yml 
 echo "Make sure db size is set in conf?" 
+
 # ceph-conf --show-config | grep bluestore |grep size  |grep wal
+# ceph-conf --show-config | grep bluestore |grep size  |grep db
+# 
+# you can /srv/salt/ceph/configuration/files/ceph.conf.j2
+# 
 #deepsea state run state.3 
 
 sudo salt "node*" ceph_sles.clean_disk_partition "/dev/bcache0,/dev/bcache1,/dev/bcache2,/dev/bcache3,/dev/bcache4"
